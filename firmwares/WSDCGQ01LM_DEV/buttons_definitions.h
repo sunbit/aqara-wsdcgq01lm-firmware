@@ -1,0 +1,7 @@
+#ifndef BUTTONS_DEFINITIONS_H
+#define BUTTONS_DEFINITIONS_H
+#define BUTTON_COUNT 1
+#define BTN_MASK (1UL << 5)
+#define BTN_RESET_MASK 0
+#define BTN_CTRL_MASK (1UL << 5)
+#endif

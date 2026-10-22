@@ -1,0 +1,5 @@
+#ifndef LEDS_DEFINITIONS_H
+#define LEDS_DEFINITIONS_H
+#define LED_MASK 0
+#define LEDS_CTRL_MASK 0
+#endif

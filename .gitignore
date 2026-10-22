@@ -1,0 +1,15 @@
+# Third-party SDK and compiler files are installed locally, never committed.
+/sdk/
+/toolchain/bin/
+/toolchain/include/
+/toolchain/lib/
+/build*/
+/.venv/
+*.elf
+*.bin
+*.map
+*.o
+*.a
+*.pyc
+__pycache__/
+.DS_Store
