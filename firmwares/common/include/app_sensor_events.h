@@ -3,4 +3,5 @@
 #include <jendefs.h>
 PUBLIC void APP_vSendSensorTimerEvent(void);
 PUBLIC void APP_vSendFreshSensorEvent(void);
+PUBLIC void APP_vSendConfigurationEvent(void);
 #endif

@@ -7,5 +7,6 @@
 #define SENSOR_LED_BLINK_MS 150
 PUBLIC void APP_vSetupLeds(void);
 PUBLIC void APP_vSensorLedPress(void);
+PUBLIC void APP_vSensorLedPairing(void);
 PUBLIC void APP_cbTimerLedBlink(void *context);
 #endif

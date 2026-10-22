@@ -50,3 +50,11 @@ Do not power the board from both the adapter and a battery at the same time. Rem
 ## 3D-printed pogo fixture
 
 A printed clamp can hold spring contacts or fixed pogo pins against JP1 pads, with short Dupont leads to the adapter. Make the fixture keyed so it cannot be placed backwards. Keep the BOOT and RESET switches accessible, insulate adjacent contacts, and avoid applying force to the sensor, crystal, or fine-pitch IC pins. Verify each contact against GND and the board labels before powering it.
+
+## Original PCB button behavior
+
+A short press sends fresh temperature, humidity and battery readings and flashes
+the LED once. A five-second hold produces three confirmation flashes, then clears
+the saved Zigbee network and starts pairing again. Calibration/reporting settings
+are retained. Open permit-join on the coordinator first. See
+[configuration](configuration.md) for timing and validation status.

@@ -12,18 +12,17 @@
 #include "sensor_probe.h"
 #include "sensor_timing.h"
 #include "sensor_wire.h"
-#include "sensor_policy.h"
+#include "sensor_reporting.h"
+#include "ConfigurationCluster.h"
+#include "app_battery_fresh.h"
+#include "app_sensor_clock.h"
 #include "dbg.h"
 
-#define SAMPLE_SECONDS SENSOR_SAMPLE_SECONDS
 #define BUS_TIMEOUT_LOOPS 500000UL /* Bounded polling, including SHT clock stretching. */
 #define SENSOR_DEFAULT_PRESCALER 31 /* 100 kHz: CRC-valid ht01 measurement in v3. */
 #define SENSOR_MEASUREMENT_COMMAND 0x2416 /* Low repeatability: v5 passed 3/3 with no resets. */
 
-PRIVATE int16_t previous_t;
-PRIVATE uint16_t previous_h;
-PRIVATE unsigned age_t, age_h;
-PRIVATE bool_t have_t, have_h;
+PRIVATE sensor_report_state report_t, report_h, report_b;
 PRIVATE sht_route sensor_route;
 PRIVATE const char *sensor_stage, *sensor_fault;
 PRIVATE unsigned sensor_byte;
@@ -218,7 +217,8 @@ PUBLIC void APP_vSensorProbe(void)
     uint16_t humidity;
     uint16 before = 0xffff, after = 0xffff;
     bool_t clear_sent, before_ok, after_ok, baseline_clear;
-    DBG_vPrintf(TRUE, "SENSOR: low repeatability 0x2416, 100kHz, report delta 0.1C\n");
+    DBG_vPrintf(TRUE, "SENSOR: low repeatability 0x2416, 100kHz, delta_centi=%d sample_seconds=%d\n",
+                APP_psSensorConfig()->temperature_delta, APP_psSensorConfig()->sample_seconds);
     diagnostic_registers(SENSOR_DEFAULT_PRESCALER);
     clear_sent = command_at(0, 0x44, SENSOR_DEFAULT_PRESCALER, 0x3041,
                              1000UL, NULL, 0, "clear-status");
@@ -255,7 +255,21 @@ PUBLIC bool_t APP_bSensorReportAttribute(uint16 cluster, uint16 attribute)
 
 PUBLIC void APP_vSensorInvalidate(void)
 {
-    have_t = have_h = FALSE; /* Any failed APS confirm forces retry next wake. */
+    report_t.have_previous = report_h.have_previous = report_b.have_previous = FALSE;
+}
+
+PUBLIC void APP_vSensorElapsed(uint32 seconds)
+{
+    sensor_report_elapsed(&report_t, seconds);
+    sensor_report_elapsed(&report_h, seconds);
+    sensor_report_elapsed(&report_b, seconds);
+}
+
+PUBLIC void APP_vSensorBatteryReport(bool_t force)
+{
+    APP_vSensorClockSync();
+    if ((force || !report_b.have_previous || report_b.age >= APP_psSensorConfig()->battery_seconds) &&
+        APP_bBatteryReportFresh()) sensor_report_sent(&report_b, 0);
 }
 
 PUBLIC void APP_vSensorSample(void)
@@ -268,27 +282,31 @@ PUBLIC void APP_vSensorSampleRequested(bool_t force_report, bool_t scheduled_sam
     int16_t temperature;
     uint16_t humidity;
     tsZCL_ClusterInstance *t, *h;
-    /* Manual presses and join are fresh reads, not extra 30-second cycles. */
-    if (scheduled_sample) {
-        if (age_t < 3600) age_t += SAMPLE_SECONDS;
-        if (age_h < 3600) age_h += SAMPLE_SECONDS;
-    }
+    const sensor_config *config = APP_psSensorConfig();
+    /* Synchronize before every read, including button/configuration requests,
+     * so a press just before a timer wake cannot overcount the report age. */
+    APP_vSensorClockSync();
+    (void)scheduled_sample;
     if (!read_sensor(&temperature, &humidity)) {
         /* Never publish fabricated, stale or CRC-invalid measurements. */
         DBG_vPrintf(TRUE, "SENSOR I2C/CRC failure; sample discarded\n");
         return;
     }
+    temperature = sensor_calibrate_temperature(temperature, config->temperature_offset);
+    humidity = sensor_calibrate_humidity(humidity, config->humidity_offset);
     if (eZCL_SearchForClusterEntry(1, 0x0402, TRUE, &t) != E_ZCL_SUCCESS ||
         eZCL_SearchForClusterEntry(1, 0x0405, TRUE, &h) != E_ZCL_SUCCESS) return;
     ((tsCLD_TemperatureMeasurement *)t->pvEndPointSharedStructPtr)->i16MeasuredValue = temperature;
     ((tsCLD_RelativeHumidityMeasurement *)h->pvEndPointSharedStructPtr)->u16MeasuredValue = humidity;
     DBG_vPrintf(TRUE, "SENSOR temperature_centi=%d humidity_centi=%d\n", temperature, humidity);
-    if ((force_report || report_due(temperature, previous_t, SENSOR_TEMPERATURE_DELTA_CENTI, age_t, SENSOR_TEMPERATURE_MAX_SECONDS, have_t)) &&
+    if (sensor_report_due(&report_t, temperature, config->temperature_delta,
+                         config->temperature_min_seconds, config->temperature_max_seconds, force_report) &&
         APP_bSensorReportAttribute(0x0402, 0)) {
-        previous_t = temperature; have_t = TRUE; age_t = 0;
+        sensor_report_sent(&report_t, temperature);
     }
-    if ((force_report || report_due(humidity, previous_h, 100, age_h, SENSOR_HUMIDITY_MAX_SECONDS, have_h)) &&
+    if (sensor_report_due(&report_h, humidity, config->humidity_delta,
+                         config->humidity_min_seconds, config->humidity_max_seconds, force_report) &&
         APP_bSensorReportAttribute(0x0405, 0)) {
-        previous_h = humidity; have_h = TRUE; age_h = 0;
+        sensor_report_sent(&report_h, humidity);
     }
 }

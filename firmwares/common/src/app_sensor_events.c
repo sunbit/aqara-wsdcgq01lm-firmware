@@ -15,10 +15,13 @@
 #include "app_sensor_button.h"
 #include "app_sensor_events.h"
 #include "app_battery_fresh.h"
+#include "AppHardwareApi.h"
 
 #define REQUEST_WAKE 1
 #define REQUEST_PERIODIC 2
 #define REQUEST_BUTTON 4
+#define REQUEST_RESET 8
+#define REQUEST_CONFIG 16
 PRIVATE volatile uint8 pending;
 
 PRIVATE void request(uint8 flags)
@@ -33,10 +36,11 @@ PRIVATE void request(uint8 flags)
 PUBLIC void APP_vSendWakeUpEvent(void) { request(REQUEST_WAKE); }
 PUBLIC void APP_vSendSensorTimerEvent(void) { request(REQUEST_PERIODIC); }
 PUBLIC void APP_vSendFreshSensorEvent(void) { request(REQUEST_BUTTON); }
+PUBLIC void APP_vSendConfigurationEvent(void) { request(REQUEST_CONFIG); }
 
 PUBLIC void APP_vSendResetDeviceEvent(void)
 {
-    DBG_vPrintf(TRUE, "BUTTON legacy reset action disabled on thermometer\n");
+    request(REQUEST_RESET);
 }
 
 PUBLIC void APP_vSendButtonEvent(uint8 endpoint, teButtonAction action)
@@ -64,7 +68,14 @@ PUBLIC void APP_vProcessEvents(void)
         PWRM_eFinishActivity();
     }
     MICRO_RESTORE_INTERRUPTS(saved);
-    if (!(flags & (REQUEST_PERIODIC | REQUEST_BUTTON))) return;
+    if (flags & REQUEST_RESET) {
+        /* Network-only reset: preserve offsets and reporting preferences. */
+        APP_vResetNetworkRecords();
+        vAHI_SwReset();
+        return;
+    }
+    if (!(flags & (REQUEST_PERIODIC | REQUEST_BUTTON | REQUEST_CONFIG))) return;
+    if (flags & REQUEST_CONFIG) APP_vSensorInvalidate();
     if (!bNodeJoined()) {
         DBG_vPrintf(TRUE, "SENSOR request skipped: node not joined; no cached reports sent\n");
         return;
@@ -74,9 +85,6 @@ PUBLIC void APP_vProcessEvents(void)
     APP_vStartPolling(POLL_REGULAR);
     DBG_vPrintf(TRUE, "SENSOR request source=%s periodic=%d\n",
                 (flags & REQUEST_BUTTON) ? "button" : "timer", !!(flags & REQUEST_PERIODIC));
-    APP_vSensorSampleRequested(!!(flags & REQUEST_BUTTON), !!(flags & REQUEST_PERIODIC));
-    if (flags & REQUEST_BUTTON)
-        APP_vBatteryReportFresh();
-    else
-        APP_vMeasureRemainingBattery();
+    APP_vSensorSampleRequested(!!(flags & (REQUEST_BUTTON | REQUEST_CONFIG)), !!(flags & REQUEST_PERIODIC));
+    APP_vSensorBatteryReport(!!(flags & (REQUEST_BUTTON | REQUEST_CONFIG)));
 }

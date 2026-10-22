@@ -9,8 +9,6 @@
 
 #include <jendefs.h>
 
-#define MAXIMUM_TIME_TO_SLEEP_SEC (60)
-
 PUBLIC void APP_vOnWakeTimer1(void);
 
 #endif /* APP_MAIN_H */

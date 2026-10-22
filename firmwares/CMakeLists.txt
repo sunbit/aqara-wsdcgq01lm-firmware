@@ -36,7 +36,7 @@ if(ENABLE_DEBUG)
     add_compile_definitions(DBG_ENABLE)
 endif()
 
-set(SDK_PREFIX ${PROJECT_SOURCE_DIR}/sdk)
+set(SDK_PREFIX ${PROJECT_SOURCE_DIR}/sdk CACHE PATH "External NXP SDK root")
 set(SDK_COMPONENTS_BASE_DIR ${SDK_PREFIX}/Components)
 
 set(SDK_INCLUDE_FOLDERS
@@ -207,6 +207,9 @@ set(APP_SRC
     common/src/app_basic_endpoint.c
     common/src/app_sensor.c
     common/src/sensor_math.c
+    common/src/sensor_config.c
+    common/src/sensor_reporting.c
+    common/src/app_sensor_clock.c
     common/src/sensor_probe.c
     common/src/sensor_timing.c
     common/src/sensor_wire.c
@@ -236,8 +239,6 @@ add_executable(${APP_TARGET} ${APP_SRC})
 
 target_compile_definitions(${APP_TARGET} PRIVATE
     SENSOR_LED_FEEDBACK=1
-    SENSOR_SAMPLE_SECONDS=60
-    SENSOR_TEMPERATURE_MAX_SECONDS=300
     DEBUG_BASIC_EP
     DEBUG_BATTERY
     DEBUG_BUTTON

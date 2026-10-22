@@ -26,3 +26,20 @@ cmake --build build-release -j1
 ```
 
 The image is written to `build-release/firmwares/WSDCGQ01LM_DEV.bin`. Keep your build log, compiler/SDK versions, and SHA-256 checksum with any firmware you share. A successful local build does not validate operation on a physical sensor.
+
+## External SDK/toolchain locations
+
+The defaults above can be replaced with existing local installations:
+
+```sh
+cmake -S . -B build-release \
+  -DCMAKE_TOOLCHAIN_FILE=toolchain/CMakeToolchain.cmake \
+  -DTOOLCHAIN_ABS_PATH=/path/to/ba2-toolchain \
+  -DSDK_PREFIX=/path/to/nxp-sdk \
+  -DTARGET=WSDCGQ01LM_DEV -DENABLE_DEBUG=OFF -DCMAKE_BUILD_TYPE=Release
+cmake --build build-release -j1
+```
+
+For a debug build, use `build-debug` and `-DENABLE_DEBUG=ON`. All future builds
+should use this repository's source. See [development and validation](development.md)
+for host tests and hardware checks.

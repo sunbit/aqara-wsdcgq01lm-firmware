@@ -1,9 +1,30 @@
 # Zigbee2MQTT
 
-The firmware advertises the Basic-cluster model string `WSDCGQ01LM-DIY`. The external converter in `../zigbee2mqtt/wsdcgq01lm-diy.mjs` matches that exact string, so stock WSDCGQ01LM sensors continue to use their existing definition.
+The firmware advertises `WSDCGQ01LM-DIY`. The matching external converter is
+[`zigbee2mqtt/wsdcgq01lm-diy.mjs`](../zigbee2mqtt/wsdcgq01lm-diy.mjs). Stock
+WSDCGQ01LM sensors keep their existing definition and are never matched by it.
 
-The converter decodes standard temperature, humidity, and battery reports. It also binds the Power Configuration cluster to the coordinator for battery reporting. Temperature resolution and the 0.1 °C report threshold are implemented in the firmware, not in Zigbee2MQTT.
+The converter exposes temperature, humidity, battery voltage and percentage,
+plus the persistent [configuration settings](configuration.md). Measurements use
+standard Zigbee attributes; configuration uses the firmware's custom cluster.
+Startup binds Power Configuration and reads settings without resetting them.
 
-To try the converter, copy it into Zigbee2MQTT's `external_converters` directory and enable external JavaScript converters in the configuration. Restart Zigbee2MQTT and pair a sensor running this custom firmware. External converters are intended for development and testing; see the [official Zigbee2MQTT guide](https://www.zigbee2mqtt.io/advanced/more/external_converters.html).
+Install the converter using the [official external-converter guide](https://www.zigbee2mqtt.io/advanced/more/external_converters.html).
+Use the Zigbee2MQTT frontend's external-converter editor or your installation's
+`external_converters` directory, then reload/restart as described by your version.
+Pair the sensor or re-interview it after updating the firmware. Short-press its
+button if a sleepy-device request times out. See [configuration](configuration.md)
+for calibration, reporting and re-pair behavior.
 
-The current file uses the converter API tested against Zigbee2MQTT 2.13.0 and `zigbee-herdsman-converters` 26.90.0. Before submitting it upstream, update it to the modern `extend` API expected by the current `zigbee-herdsman-converters` project, settle an MIT-compatible redistribution license for this original converter code, then follow Zigbee2MQTT's [support-new-devices guide](https://www.zigbee2mqtt.io/advanced/support-new-devices/01_support_new_devices.html). Device definitions belong in `zigbee-herdsman-converters`, not in the Zigbee2MQTT core repository.
+The converter tests use `zigbee-herdsman-converters` 26.90.0, the API used by the
+pilot's Zigbee2MQTT 2.13.0 installation. These are host simulations, including
+actual herdsman ZCL frame encoding/decoding; they are not an on-radio validation
+of the new settings. The converter has a separate MIT license.
+
+A branch is prepared in [sunbit/zigbee-herdsman-converters](https://github.com/sunbit/zigbee-herdsman-converters/tree/aqara-wsdcgq01lm-diy).
+Its modern-extend sources are mirrored in [`zigbee2mqtt/upstream`](../zigbee2mqtt/upstream/)
+and tested against converters 26.123.0.
+Before proposing upstream support, validate the new firmware on hardware and
+adapt the definition to the current upstream conventions. Device definitions
+belong in `zigbee-herdsman-converters`, not Zigbee2MQTT core. Follow the official
+[support-new-devices guide](https://www.zigbee2mqtt.io/advanced/support-new-devices/01_support_new_devices.html).

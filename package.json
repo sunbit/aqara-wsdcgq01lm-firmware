@@ -1,0 +1,12 @@
+{
+  "name": "aqara-wsdcgq01lm-firmware-tests",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.25.0",
+  "scripts": {
+    "test": "node --test tests/converter.test.mjs"
+  },
+  "devDependencies": {
+    "zigbee-herdsman-converters": "26.90.0"
+  }
+}

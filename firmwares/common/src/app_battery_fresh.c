@@ -10,6 +10,11 @@
 
 PUBLIC void APP_vBatteryReportFresh(void)
 {
+    (void)APP_bBatteryReportFresh();
+}
+
+PUBLIC bool_t APP_bBatteryReportFresh(void)
+{
     uint32 budget = 500000UL, millivolts, percentage;
     uint16 raw;
     tsZCL_ClusterInstance *power;
@@ -20,7 +25,7 @@ PUBLIC void APP_vBatteryReportFresh(void)
         if (!--budget) {
             vAHI_AdcDisable();
             DBG_vPrintf(TRUE, "BATTERY fresh ADC timeout; no cached battery report sent\n");
-            return;
+            return FALSE;
         }
     }
     vAHI_AdcDisable();
@@ -31,7 +36,7 @@ PUBLIC void APP_vBatteryReportFresh(void)
     if (percentage > 100) percentage = 100;
     if (eZCL_SearchForClusterEntry(1, GENERAL_CLUSTER_ID_POWER_CONFIGURATION, TRUE, &power) != E_ZCL_SUCCESS) {
         DBG_vPrintf(TRUE, "BATTERY fresh power cluster unavailable; report skipped\n");
-        return;
+        return FALSE;
     }
     ((tsCLD_PowerConfiguration *)power->pvEndPointSharedStructPtr)->u8BatteryVoltage = millivolts / 100;
     ((tsCLD_PowerConfiguration *)power->pvEndPointSharedStructPtr)->u8BatteryPercentageRemaining = percentage * 2;
@@ -40,4 +45,5 @@ PUBLIC void APP_vBatteryReportFresh(void)
     percentage_sent = APP_bSensorReportAttribute(GENERAL_CLUSTER_ID_POWER_CONFIGURATION, 0x0021);
     DBG_vPrintf(TRUE, "BATTERY fresh reports submitted voltage=%d percentage=%d\n",
                 voltage_sent, percentage_sent);
+    return voltage_sent && percentage_sent;
 }

@@ -13,6 +13,9 @@
 PRIVATE button_debounce button;
 PRIVATE volatile bool_t scanning;
 PRIVATE bool_t configured;
+PRIVATE unsigned hold_ticks;
+PRIVATE bool_t hold_armed;
+#define LONG_PRESS_TICKS 500 /* 5 seconds after the 30 ms press debounce. */
 
 PRIVATE bool_t pressed_now(void)
 {
@@ -48,7 +51,11 @@ PUBLIC void APP_vConfigureButtons(void)
     vAHI_DioInterruptEnable(0, SENSOR_BUTTON_MASK);
     vAHI_DioSetDirection(SENSOR_BUTTON_MASK, 0);
     vAHI_DioSetPullup(SENSOR_BUTTON_MASK, 0);
-    button.pressed = button.count = 0;
+    /* A button still held across the re-pair reboot must not reset in a loop. */
+    button.pressed = pressed_now();
+    button.count = 0;
+    hold_ticks = 0;
+    hold_armed = FALSE;
     scanning = FALSE;
     configured = TRUE;
 #ifdef SENSOR_LED_FEEDBACK
@@ -82,7 +89,8 @@ PUBLIC void APP_vSensorButtonWake(uint32 status)
 
 PUBLIC bool_t APP_bSensorButtonDebouncing(void)
 {
-    return scanning;
+    /* Holding the long-press timer must not delay the initial fresh report. */
+    return scanning && (button.count || pressed_now() != button.pressed);
 }
 
 PUBLIC void APP_cbTimerButtonScan(void *context)
@@ -91,15 +99,29 @@ PUBLIC void APP_cbTimerButtonScan(void *context)
     (void)context;
     edge = button_debounce_update(&button, pressed_now());
     if (edge > 0) {
+        hold_ticks = 0;
+        hold_armed = TRUE;
 #ifdef SENSOR_LED_FEEDBACK
         APP_vSensorLedPress();
 #endif
         DBG_vPrintf(TRUE, "BUTTON pressed DIO5: request fresh temperature/humidity/battery\n");
         APP_vSendFreshSensorEvent();
     } else if (edge < 0) {
+        hold_armed = FALSE;
+        hold_ticks = 0;
         DBG_vPrintf(TRUE, "BUTTON released DIO5\n");
+    } else if (hold_armed && button.pressed && pressed_now()) {
+        if (++hold_ticks >= LONG_PRESS_TICKS) {
+            hold_armed = FALSE;
+            DBG_vPrintf(TRUE, "BUTTON held 5 seconds: confirm re-pair with three blinks\n");
+#ifdef SENSOR_LED_FEEDBACK
+            APP_vSensorLedPairing();
+#else
+            APP_vSendResetDeviceEvent();
+#endif
+        }
     }
-    if (button.count) {
+    if (button.count || hold_armed) {
         ZTIMER_eStart(u8TimerButtonScan, BUTTON_SCAN_TIME_MSEC);
     } else {
         ZTIMER_eStop(u8TimerButtonScan);

@@ -14,6 +14,8 @@
 #include "app_sensor.h"
 #include "app_sensor_button.h"
 #include "app_sensor_events.h"
+#include "ConfigurationCluster.h"
+#include "app_sensor_clock.h"
 
 #ifdef DBG_ENABLE
 PRIVATE uint32 logSleepAttempt = 0;
@@ -21,6 +23,7 @@ PRIVATE uint32 logSleepAttempt = 0;
 
 PRIVATE pwrm_tsWakeTimerEvent wakeStruct;
 PRIVATE bool_t bActivityScheduled = FALSE;
+PRIVATE uint32 scheduled_seconds;
 
 PRIVATE void vWaitForXTAL(void);
 PRIVATE void vInitDebugUART(void);
@@ -65,6 +68,7 @@ PUBLIC void vAppMain(void)
     vAPConfigure();
     APP_vInitResources();
     APP_vInitialise(vfExtendedStatusCallBack);
+    APP_vSensorClockInit();
     APP_vSensorProbe();
     BDB_vStart();
     vMainLoop();
@@ -246,9 +250,10 @@ PRIVATE void vAttemptToSleep(void)
             if (bActivityScheduled == FALSE)
             {
                 PWRM_vInit(E_AHI_SLEEP_OSCON_RAMON);
-                DBG_vPrintf(TRACE_MAIN, "APP MAIN: Going to E_AHI_SLEEP_OSCON_RAMON sleep for %d seconds\n", MAXIMUM_TIME_TO_SLEEP_SEC);
-                PWRM_teStatus u8Status = PWRM_eScheduleActivity(&wakeStruct, MAXIMUM_TIME_TO_SLEEP_SEC * 1000 * 32, vWakeCallBack);
-                bActivityScheduled = TRUE;
+                scheduled_seconds = APP_psSensorConfig()->sample_seconds;
+                DBG_vPrintf(TRACE_MAIN, "APP MAIN: Next sample in %d seconds\n", scheduled_seconds);
+                PWRM_teStatus u8Status = PWRM_eScheduleActivity(&wakeStruct, scheduled_seconds * 1000UL * 32UL, vWakeCallBack);
+                bActivityScheduled = u8Status == PWRM_E_OK;
                 DBG_vPrintf(TRACE_MAIN, "APP MAIN: PWRM_eScheduleActivity status: %d\n", u8Status);
             }
             else

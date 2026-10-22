@@ -7,6 +7,7 @@
 #include <jendefs.h>
 #include "zcl.h"
 #include "zcl_options.h"
+#include "sensor_config.h"
 
 #ifdef DEBUG_CONFIGURATION_CLUSTER
 #define TRACE_CONFIGURATION_CLUSTER TRUE
@@ -16,6 +17,7 @@
 
 #define GENERAL_CLUSTER_ID_CONFIGURATION 0xfc00
 #define PDM_ID_CONFIGURATION_CLUSTER 0x9
+#define PDM_ID_SENSOR_CONFIGURATION 0xA
 
 typedef enum
 {
@@ -34,6 +36,7 @@ typedef struct
 {
     zenum8 eButtonMode;
     zbool bPreventReset;
+    sensor_config sensor;
 } tsCLD_Configuration;
 
 PUBLIC teZCL_Status eCLD_ConfigurationCreateConfiguration(
@@ -50,5 +53,6 @@ extern const tsZCL_AttributeDefinition asCLD_ConfigurationClusterAttributeDefini
 PUBLIC void vHandleConfigurationClusterAttrsRange(tsZCL_CallBackEvent *psEvent);
 PUBLIC void vHandleConfigurationClusterAttrsWrite(tsZCL_CallBackEvent *psEvent, tsCLD_Configuration *sConfigCluster);
 PUBLIC void vResetConfigurationCluster(void);
+PUBLIC const sensor_config *APP_psSensorConfig(void);
 
 #endif /* CONFIGURATION_CLUSTER_H */

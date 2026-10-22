@@ -172,6 +172,7 @@ PRIVATE void vHandleNetworkJoinAndRejoin(void)
     eNodeState = E_JOINED;
     APP_vSensorInvalidate();
     APP_vSensorSampleRequested(FALSE, FALSE);
+    APP_vSensorBatteryReport(TRUE);
     PDM_eSaveRecordData(PDM_ID_APP_END_DEVICE, &eNodeState, sizeof(teNodeState));
     ZPS_vSaveAllZpsRecords();
 }

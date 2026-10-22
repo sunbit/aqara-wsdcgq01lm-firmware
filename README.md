@@ -2,13 +2,13 @@
 
 Experimental firmware for the round Aqara WSDCGQ01LM temperature and humidity sensor with the NXP JN5169 and Sensirion SHT30. It reports temperature changes at 0.1 °C resolution, keeps the original PCB button useful, and blinks the original LED when the button is pressed.
 
-This project is for the **custom `WSDCGQ01LM-DIY` firmware only**. It does not replace the stock Aqara firmware or claim support for unmodified WSDCGQ01LM sensors.
+The included Zigbee2MQTT converter matches **custom `WSDCGQ01LM-DIY` firmware only**. Unmodified WSDCGQ01LM sensors continue to use their stock device definition.
 
 ## Status
 
-The current firmware reports temperature changes at 0.1 °C resolution and provides humidity, battery, button-triggered fresh readings, and LED feedback. It has been confirmed on a pilot sensor. Battery-powered runtime and long-term stability still need verification, so treat the project as experimental.
+The reporting path, short-button readings and LED feedback have been confirmed on a pilot sensor. Persistent configuration and the five-second re-pair gesture have host-test coverage; their physical validation is still pending. Battery-powered runtime and long-term stability also need verification, so treat the project as experimental.
 
-The current firmware samples once per minute, reports a temperature heartbeat after five sample cycles, and reports a temperature change when the difference from the last successfully reported value reaches 0.1 °C. Discrete samples cannot guarantee observing every short-lived temperature excursion.
+By default, the current firmware samples once per minute, reports temperature changes of 0.1 °C and sends a temperature heartbeat every five minutes. Offsets, change thresholds, measurement frequency and report intervals are configurable and saved in the sensor. Hold the original button for five seconds to re-pair, confirmed by three LED flashes. See [configuration](docs/configuration.md) for all settings and [development](docs/development.md) for test coverage and remaining physical checks. Discrete samples cannot guarantee observing every short-lived temperature excursion.
 
 ## Hardware
 
