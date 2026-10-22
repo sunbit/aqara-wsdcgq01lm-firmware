@@ -8,6 +8,8 @@ The included Zigbee2MQTT converter matches **custom `WSDCGQ01LM-DIY` firmware on
 
 The reporting path, short-button readings and LED feedback have been confirmed on a pilot sensor. Persistent configuration and the five-second re-pair gesture have host-test coverage; their physical validation is still pending. Battery-powered runtime and long-term stability also need verification, so treat the project as experimental.
 
+A battery-only measurement failure was reproduced on the pilot's earlier fixed-policy build: button presses still sent battery reports, but fresh temperature/humidity returned only with external power. The current configurable build has not yet been physically tested. See [battery troubleshooting](docs/troubleshooting.md) before deploying to more sensors.
+
 By default, the current firmware samples once per minute, reports temperature changes of 0.1 °C and sends a temperature heartbeat every five minutes. Offsets, change thresholds, measurement frequency and report intervals are configurable and saved in the sensor. Hold the original button for five seconds to re-pair, confirmed by three LED flashes. See [configuration](docs/configuration.md) for all settings and [development](docs/development.md) for test coverage and remaining physical checks. Discrete samples cannot guarantee observing every short-lived temperature excursion.
 
 ## Hardware
