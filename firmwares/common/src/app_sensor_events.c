@@ -16,6 +16,10 @@
 #include "app_sensor_events.h"
 #include "app_battery_fresh.h"
 #include "AppHardwareApi.h"
+#ifdef SENSOR_LED_DIAGNOSTICS
+#include "app_sensor_led.h"
+#include "sensor_diagnostic.h"
+#endif
 
 #define REQUEST_WAKE 1
 #define REQUEST_PERIODIC 2
@@ -77,6 +81,9 @@ PUBLIC void APP_vProcessEvents(void)
     if (!(flags & (REQUEST_PERIODIC | REQUEST_BUTTON | REQUEST_CONFIG))) return;
     if (flags & REQUEST_CONFIG) APP_vSensorInvalidate();
     if (!bNodeJoined()) {
+#ifdef SENSOR_LED_DIAGNOSTICS
+        if (flags & REQUEST_BUTTON) APP_vSensorLedDiagnostic(SENSOR_DIAG_NOT_JOINED);
+#endif
         DBG_vPrintf(TRUE, "SENSOR request skipped: node not joined; no cached reports sent\n");
         return;
     }
@@ -87,4 +94,7 @@ PUBLIC void APP_vProcessEvents(void)
                 (flags & REQUEST_BUTTON) ? "button" : "timer", !!(flags & REQUEST_PERIODIC));
     APP_vSensorSampleRequested(!!(flags & (REQUEST_BUTTON | REQUEST_CONFIG)), !!(flags & REQUEST_PERIODIC));
     APP_vSensorBatteryReport(!!(flags & (REQUEST_BUTTON | REQUEST_CONFIG)));
+#ifdef SENSOR_LED_DIAGNOSTICS
+    if (flags & REQUEST_BUTTON) APP_vSensorLedDiagnostic(APP_uSensorDiagnosticResult());
+#endif
 }

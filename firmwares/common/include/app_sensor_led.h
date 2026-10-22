@@ -8,5 +8,8 @@
 PUBLIC void APP_vSetupLeds(void);
 PUBLIC void APP_vSensorLedPress(void);
 PUBLIC void APP_vSensorLedPairing(void);
+#ifdef SENSOR_LED_DIAGNOSTICS
+PUBLIC void APP_vSensorLedDiagnostic(unsigned code);
+#endif
 PUBLIC void APP_cbTimerLedBlink(void *context);
 #endif

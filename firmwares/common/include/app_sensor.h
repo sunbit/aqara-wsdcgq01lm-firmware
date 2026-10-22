@@ -8,4 +8,7 @@ PUBLIC void APP_vSensorInvalidate(void);
 PUBLIC void APP_vSensorElapsed(uint32 seconds);
 PUBLIC void APP_vSensorBatteryReport(bool_t force);
 PUBLIC void APP_vSensorProbe(void);
+#ifdef SENSOR_LED_DIAGNOSTICS
+PUBLIC unsigned APP_uSensorDiagnosticResult(void);
+#endif
 #endif

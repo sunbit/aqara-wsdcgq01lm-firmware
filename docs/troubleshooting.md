@@ -61,3 +61,43 @@ common GND only, with adapter VCC and TX disconnected. If the fixture prevents
 battery insertion, arrange an accessible battery connection first or provide a
 diagnostic channel that works on the assembled battery-powered board. A UART
 capture taken only on external power cannot explain a battery-only failure.
+
+### Optional LED diagnostic build
+
+Build from this repository with `-DSENSOR_LED_DIAGNOSTICS=ON` and
+`-DENABLE_DEBUG=OFF`, using a separate `build-led-diagnostic` directory and the
+same external SDK/toolchain arguments as in [building](building.md). Normal
+release builds leave this option OFF. This profile does not change I²C speed,
+conversion command, conversion wait, bus pullups or recovery policy. It is based
+on the current configurable source, rather than an exact copy of the earlier
+fixed-policy image; it is a diagnostic candidate, not a validated replacement.
+
+After a **short press and release**, the original 150 ms flash is followed by
+one second OFF and a result code. Count the **second group**: each pulse is
+300 ms ON, separated by 300 ms OFF. There is no diagnostic group on automatic
+samples. Another short press replaces a pending result. Do not hold the button:
+the current firmware's five-second re-pair gesture remains active and takes
+priority over diagnostics.
+
+| Second-group pulses | Meaning |
+| --- | --- |
+| 1 | Valid T/H measurement; both forced report submissions accepted locally |
+| 2 | SHT30 did not ACK the write address on DIO14/15, address 0x44 |
+| 3 | SHT30 did not ACK the read address after the conversion wait on that route |
+| 4 | A six-byte reply arrived on that route but at least one CRC failed |
+| 5 | Tick-wait or I²C-transfer timeout on that route |
+| 6 | Other transport failure on that route, such as command NACK or arbitration loss |
+| 7 | Valid measurement, but the T/H application clusters could not be found |
+| 8 | Valid measurement, but at least one T/H report submission failed locally |
+| 9 | The application does not consider itself joined; no measurement attempted |
+
+Transport codes describe the pilot's confirmed DIO14/15/0x44 route. Failed probes
+of alternate routes do not overwrite that result. A valid measurement through
+any supported route takes precedence. Code 1 is **not** proof of over-air
+delivery; correlate it with received MQTT reports. A code-5 timeout does not
+identify whether the sensor supply, bus or MCU timer caused the failure.
+
+The extra flashes keep the CPU awake and consume energy. Do not use this profile
+to assess battery consumption. It does not intentionally clear network state or
+persist diagnostics. It requires a separate physical flash; compilation and
+host tests do not establish that the displayed code is correct on real hardware.

@@ -17,6 +17,11 @@
 #include "app_battery_fresh.h"
 #include "app_sensor_clock.h"
 #include "dbg.h"
+#ifdef SENSOR_LED_DIAGNOSTICS
+#include "sensor_diagnostic.h"
+PRIVATE unsigned diagnostic_result = SENSOR_DIAG_TRANSPORT;
+PUBLIC unsigned APP_uSensorDiagnosticResult(void) { return diagnostic_result; }
+#endif
 
 #define BUS_TIMEOUT_LOOPS 500000UL /* Bounded polling, including SHT clock stretching. */
 #define SENSOR_DEFAULT_PRESCALER 31 /* 100 kHz: CRC-valid ht01 measurement in v3. */
@@ -168,9 +173,17 @@ PRIVATE bool_t command_at(unsigned location, uint8 address, uint8 prescaler,
 
 PRIVATE int read_at(unsigned location, uint8_t address, uint8_t data[6], void *context)
 {
+    int received;
     (void)context;
-    return command_at(location, address, SENSOR_DEFAULT_PRESCALER,
+    received = command_at(location, address, SENSOR_DEFAULT_PRESCALER,
                       SENSOR_MEASUREMENT_COMMAND, 20000UL, data, 6, "measurement-low");
+#ifdef SENSOR_LED_DIAGNOSTICS
+    if (location == 0 && address == 0x44)
+        diagnostic_result = sensor_diagnostic_transport(received,
+            received && data[2] == sht_crc(data, 2) && data[5] == sht_crc(data + 3, 2),
+            sensor_stage, sensor_fault);
+#endif
+    return received;
 }
 
 PRIVATE void diagnostic_registers(uint8 prescaler)
@@ -199,7 +212,13 @@ PRIVATE bool_t diagnostic_status(const char *label, uint16 *status)
 
 PRIVATE bool_t read_sensor(int16_t *temperature, uint16_t *humidity)
 {
+#ifdef SENSOR_LED_DIAGNOSTICS
+    diagnostic_result = SENSOR_DIAG_TRANSPORT;
+#endif
     bool_t valid = sht_probe(&sensor_route, read_at, NULL, temperature, humidity);
+#ifdef SENSOR_LED_DIAGNOSTICS
+    if (valid) diagnostic_result = SENSOR_DIAG_OK;
+#endif
     if (valid) {
         DBG_vPrintf(TRUE, "SENSOR CRC OK SCL=DIO%d SDA=DIO%d addr=0x%02x temperature_centi=%d humidity_centi=%d\n",
                     sensor_route.location ? 16 : 14, sensor_route.location ? 17 : 15,
@@ -295,18 +314,27 @@ PUBLIC void APP_vSensorSampleRequested(bool_t force_report, bool_t scheduled_sam
     temperature = sensor_calibrate_temperature(temperature, config->temperature_offset);
     humidity = sensor_calibrate_humidity(humidity, config->humidity_offset);
     if (eZCL_SearchForClusterEntry(1, 0x0402, TRUE, &t) != E_ZCL_SUCCESS ||
-        eZCL_SearchForClusterEntry(1, 0x0405, TRUE, &h) != E_ZCL_SUCCESS) return;
+        eZCL_SearchForClusterEntry(1, 0x0405, TRUE, &h) != E_ZCL_SUCCESS) {
+#ifdef SENSOR_LED_DIAGNOSTICS
+        diagnostic_result = SENSOR_DIAG_CLUSTER;
+#endif
+        return;
+    }
     ((tsCLD_TemperatureMeasurement *)t->pvEndPointSharedStructPtr)->i16MeasuredValue = temperature;
     ((tsCLD_RelativeHumidityMeasurement *)h->pvEndPointSharedStructPtr)->u16MeasuredValue = humidity;
     DBG_vPrintf(TRUE, "SENSOR temperature_centi=%d humidity_centi=%d\n", temperature, humidity);
     if (sensor_report_due(&report_t, temperature, config->temperature_delta,
-                         config->temperature_min_seconds, config->temperature_max_seconds, force_report) &&
-        APP_bSensorReportAttribute(0x0402, 0)) {
-        sensor_report_sent(&report_t, temperature);
+                         config->temperature_min_seconds, config->temperature_max_seconds, force_report)) {
+        if (APP_bSensorReportAttribute(0x0402, 0)) sensor_report_sent(&report_t, temperature);
+#ifdef SENSOR_LED_DIAGNOSTICS
+        else diagnostic_result = SENSOR_DIAG_REPORT;
+#endif
     }
     if (sensor_report_due(&report_h, humidity, config->humidity_delta,
-                         config->humidity_min_seconds, config->humidity_max_seconds, force_report) &&
-        APP_bSensorReportAttribute(0x0405, 0)) {
-        sensor_report_sent(&report_h, humidity);
+                         config->humidity_min_seconds, config->humidity_max_seconds, force_report)) {
+        if (APP_bSensorReportAttribute(0x0405, 0)) sensor_report_sent(&report_h, humidity);
+#ifdef SENSOR_LED_DIAGNOSTICS
+        else diagnostic_result = SENSOR_DIAG_REPORT;
+#endif
     }
 }
