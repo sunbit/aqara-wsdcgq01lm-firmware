@@ -13,7 +13,7 @@ PUBLIC void APP_vSetupLeds(void)
     vAHI_DioSetDirection(0, SENSOR_LED_MASK);
     vAHI_DioSetPullup(0, SENSOR_LED_MASK);
     ZTIMER_eStop(u8TimerLedBlink);
-    DBG_vPrintf(TRUE, "LED v12: DIO9 active-low; 150ms on debounced PCB press\n");
+    DBG_vPrintf(TRUE, "LED: DIO9 active-low; 150ms on debounced PCB press\n");
 }
 
 PUBLIC void APP_vSensorLedPress(void)
@@ -25,9 +25,9 @@ PUBLIC void APP_vSensorLedPress(void)
     vAHI_DioSetOutput(0, SENSOR_LED_MASK);
     if (ZTIMER_eStart(u8TimerLedBlink, ZTIMER_TIME_MSEC(SENSOR_LED_BLINK_MS)) != E_ZTIMER_OK) {
         vAHI_DioSetOutput(SENSOR_LED_MASK, 0);
-        DBG_vPrintf(TRUE, "LED v12: timer failed; DIO9 restored OFF\n");
+        DBG_vPrintf(TRUE, "LED: timer failed; DIO9 restored OFF\n");
     } else {
-        DBG_vPrintf(TRUE, "LED v12: button blink ON DIO9\n");
+        DBG_vPrintf(TRUE, "LED: button blink ON DIO9\n");
     }
 }
 
@@ -36,5 +36,5 @@ PUBLIC void APP_cbTimerLedBlink(void *context)
     (void)context;
     ZTIMER_eStop(u8TimerLedBlink);
     vAHI_DioSetOutput(SENSOR_LED_MASK, 0);
-    DBG_vPrintf(TRUE, "LED v12: button blink OFF DIO9\n");
+    DBG_vPrintf(TRUE, "LED: button blink OFF DIO9\n");
 }

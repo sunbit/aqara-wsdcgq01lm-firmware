@@ -218,7 +218,7 @@ PUBLIC void APP_vSensorProbe(void)
     uint16_t humidity;
     uint16 before = 0xffff, after = 0xffff;
     bool_t clear_sent, before_ok, after_ok, baseline_clear;
-    DBG_vPrintf(TRUE, "SENSOR candidate v6: low repeatability 0x2416, 100kHz, report delta 0.1C\n");
+    DBG_vPrintf(TRUE, "SENSOR: low repeatability 0x2416, 100kHz, report delta 0.1C\n");
     diagnostic_registers(SENSOR_DEFAULT_PRESCALER);
     clear_sent = command_at(0, 0x44, SENSOR_DEFAULT_PRESCALER, 0x3041,
                              1000UL, NULL, 0, "clear-status");

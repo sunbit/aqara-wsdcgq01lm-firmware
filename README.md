@@ -6,9 +6,9 @@ This project is for the **custom `WSDCGQ01LM-DIY` firmware only**. It does not r
 
 ## Status
 
-The v12 debug firmware has reported real temperature and humidity values to MQTT, and its button and LED behavior were confirmed on the pilot. The v13 release candidate has been built but has not yet been validated on hardware. Battery-powered runtime, battery life, and multi-day stability remain unverified. Treat the project as experimental until those checks are complete.
+The current firmware reports temperature changes at 0.1 °C resolution and provides humidity, battery, button-triggered fresh readings, and LED feedback. It has been confirmed on a pilot sensor. Battery-powered runtime and long-term stability still need verification, so treat the project as experimental.
 
-The current candidate samples once per minute, reports a temperature heartbeat after five sample cycles, and reports a temperature change when the difference from the last successfully reported value reaches 0.1 °C. Discrete samples cannot guarantee observing every short-lived temperature excursion.
+The current firmware samples once per minute, reports a temperature heartbeat after five sample cycles, and reports a temperature change when the difference from the last successfully reported value reaches 0.1 °C. Discrete samples cannot guarantee observing every short-lived temperature excursion.
 
 ## Hardware
 

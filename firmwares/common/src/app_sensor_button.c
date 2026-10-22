@@ -52,9 +52,9 @@ PUBLIC void APP_vConfigureButtons(void)
     scanning = FALSE;
     configured = TRUE;
 #ifdef SENSOR_LED_FEEDBACK
-    DBG_vPrintf(TRUE, "BUTTON v12: DIO5 active-low; LED DIO9; fresh temperature/humidity/battery on press\n");
+    DBG_vPrintf(TRUE, "BUTTON: DIO5 active-low; LED DIO9; fresh temperature/humidity/battery on press\n");
 #else
-    DBG_vPrintf(TRUE, "BUTTON v9: DIO5 active-low; fresh temperature/humidity/battery on press\n");
+    DBG_vPrintf(TRUE, "BUTTON: DIO5 active-low; fresh temperature/humidity/battery on press\n");
 #endif
     arm_next_edge();
 }
