@@ -53,7 +53,7 @@ export default class PersistentDiagnostics {
     start() {this.eventBus.onDeviceMessage(this, (data) => this.receive(data));}
     stop() {this.eventBus.removeListeners(this);}
     async receive(data) {
-        if (data.cluster !== 0xfc01 || !['attributeReport', 'readResponse'].includes(data.type) ||
+        if (![0xfc01, '64513'].includes(data.cluster) || !['attributeReport', 'readResponse'].includes(data.type) ||
             data.device?.zh?.modelID !== 'WSDCGQ01LM-DIY') return;
         const result = decodeDiagnosticPacket(data.data?.[0]);
         const name = data.device.name ?? data.device.ieeeAddr;

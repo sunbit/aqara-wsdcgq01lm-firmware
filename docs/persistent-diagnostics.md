@@ -96,6 +96,10 @@ It is tested against the Zigbee2MQTT 2.13.0 extension API in host simulations;
 live reception still requires validation. The temporary unknown cluster may
 also appear in Zigbee2MQTT debug logs.
 
+For parsed ZCL messages, herdsman identifies this unknown cluster by the decimal
+string `"64513"`. The receiver accepts that representation and numeric `0xfc01`;
+the integration test uses the name returned by the actual ZCL decoder.
+
 Start a passive subscription to the exact diagnostic topic **before** the test.
 Capture one JSON object per line as `{"topic":"...","payload":{...}}`.
 Once collected, assemble and verify it locally:

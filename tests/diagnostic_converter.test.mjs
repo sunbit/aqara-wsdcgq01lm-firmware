@@ -46,10 +46,19 @@ test('actual C records survive ZCL reports, isolated extension publication and p
                 [{attrId: 0, dataType: 0x41, attrData: packet}], {});
             const bytes = frame.toBuffer();
             const decoded = Zcl.Frame.fromBuffer(0xfc01, Zcl.Header.fromBuffer(bytes), bytes, {});
-            await listener({cluster: 0xfc01, type: 'attributeReport',
+            // Herdsman emits frame.cluster.name for parsed ZCL messages. For
+            // an unknown cluster that is the decimal string, not its numeric ID.
+            assert.equal(decoded.cluster.name, '64513');
+            await listener({cluster: decoded.cluster.name, type: 'attributeReport',
                 device: {name: 'test/device', zh: {modelID: 'WSDCGQ01LM-DIY'}},
                 data: {0: decoded.payload[0].attrData}});
         }
+        assert.equal(lines.length, packets.length);
+        // Retain compatibility with callers that supply the numeric ID.
+        await listener({cluster: 0xfc01, type: 'attributeReport',
+            device: {name: 'test/device', zh: {modelID: 'WSDCGQ01LM-DIY'}},
+            data: {0: packets[0]}});
+        assert.equal(lines.length, packets.length + 1);
         const count = lines.length;
         await listener({cluster: 0xfc01, type: 'attributeReport', device: {zh: {modelID: 'stock'}}, data: {0: packets[0]}});
         await listener({cluster: 'msTemperatureMeasurement', type: 'attributeReport', data: {}});
