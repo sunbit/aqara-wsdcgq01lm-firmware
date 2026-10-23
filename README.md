@@ -20,6 +20,11 @@ See [hardware and wiring](docs/hardware.md) for the observed board revision, GPI
 
 See [flashing instructions](docs/flashing.md). Flashing requires a 3.3 V USB-UART adapter, physical access to the board pads, and a JN5169-compatible programmer. This repository does not include a programmer binary, the NXP SDK, or the compiler toolchain.
 
+An optional [persistent diagnostic image](docs/persistent-diagnostics.md) runs
+16 battery tests, saves the completed lot and reports it over a separate
+Zigbee/MQTT channel. It is a temporary investigation tool with physical
+validation pending; normal firmware behavior is unchanged by default.
+
 ## Build
 
 The application source and CMake project are included. Obtain the NXP JN516x ZigBee 3.0 SDK and the BA2/JN51xx compiler toolchain separately, under their own terms, then install them locally as described in [building](docs/building.md). Do not commit those third-party files or generated build products.

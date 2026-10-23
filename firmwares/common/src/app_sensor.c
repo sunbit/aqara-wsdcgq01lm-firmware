@@ -18,6 +18,11 @@
 #include "app_battery_fresh.h"
 #include "app_sensor_clock.h"
 #include "dbg.h"
+#ifdef SENSOR_PERSISTENT_DIAGNOSTICS
+#include "app_diagnostic_suite.h"
+#include "app_sensor_led.h"
+PRIVATE uint32 diagnostic_idle;
+#endif
 #ifdef SENSOR_LED_DIAGNOSTICS
 #include "sensor_diagnostic.h"
 PRIVATE unsigned diagnostic_result = SENSOR_DIAG_TRANSPORT;
@@ -118,9 +123,10 @@ PRIVATE const sht_wire_io sensor_io = {
     wire_address, wire_write, wire_read, wire_transfer, wire_wait_us, wire_stage
 };
 
-PRIVATE bool_t command_at(unsigned location, uint8 address, uint8 prescaler,
+PRIVATE bool_t command_at_configured(unsigned location, uint8 address, uint8 prescaler,
                           uint16 command, uint32 wait_us, uint8 *data,
-                          unsigned length, const char *label)
+                          unsigned length, const char *label,
+                          uint32 settle_us, bool_t pullups)
 {
     uint32 pins = location ? ((1UL << 16) | (1UL << 17)) :
                              ((1UL << 14) | (1UL << 15));
@@ -131,14 +137,17 @@ PRIVATE bool_t command_at(unsigned location, uint8 address, uint8 prescaler,
      * attempt, including address NACK, timeout and invalid sensor response. */
     vAHI_SiMasterDisable();
     vAHI_DioSetDirection(pins, 0);
-    vAHI_DioSetPullup(pins, 0);
+    vAHI_DioSetPullup(pullups ? pins : 0, pullups ? 0 : pins);
     vAHI_SiMasterConfigure(TRUE, FALSE, prescaler);
     vAHI_SiSetLocation(location != 0);
     sensor_stage = "bus-settle";
     sensor_fault = "none";
     sensor_byte = 0;
-    received = wait_sensor_ticks(SENSOR_BUS_SETTLE_US * 16UL);
+    received = wait_sensor_ticks(settle_us * 16UL);
     idle_levels = u32AHI_DioReadInput();
+#ifdef SENSOR_PERSISTENT_DIAGNOSTICS
+    diagnostic_idle=idle_levels;
+#endif
     if (received) received = sht_command_read(&sensor_io, NULL, address,
                                               command, wait_us, data, length);
     if (!received) {
@@ -171,6 +180,75 @@ PRIVATE bool_t command_at(unsigned location, uint8 address, uint8 prescaler,
     }
     return received;
 }
+
+PRIVATE bool_t command_at(unsigned location, uint8 address, uint8 prescaler,
+                          uint16 command, uint32 wait_us, uint8 *data,
+                          unsigned length, const char *label)
+{
+    return command_at_configured(location,address,prescaler,command,wait_us,data,
+        length,label,SENSOR_BUS_SETTLE_US,TRUE);
+}
+
+#ifdef SENSOR_PERSISTENT_DIAGNOSTICS
+PRIVATE unsigned diagnostic_name(const char *name, const char *const *names, unsigned count)
+{
+    unsigned n;
+    for (n=0;n<count;++n) if (strcmp(name,names[n])==0) return n;
+    return 255;
+}
+PRIVATE bool_t diagnostic_clear_bus(void)
+{
+    const uint32 scl=1UL<<14, sda=1UL<<15;
+    bool_t ok=TRUE;
+    unsigned n;
+    vAHI_SiMasterDisable();
+    vAHI_DioSetDirection(scl|sda,0); vAHI_DioSetPullup(scl|sda,0);
+    vAHI_DioSetOutput(0,scl); /* Preload LOW; HIGH is input/release only. */
+    for (n=0;n<9;++n) {
+        vAHI_DioSetDirection(0,scl);
+        if (!wait_sensor_ticks(800)) {ok=FALSE; break;}
+        vAHI_DioSetDirection(scl,0);
+        if (!wait_sensor_ticks(800) || !(u32AHI_DioReadInput()&scl)) {ok=FALSE; break;}
+    }
+    vAHI_DioSetDirection(scl|sda,0); vAHI_DioSetPullup(0,scl|sda);
+    return ok;
+}
+PUBLIC void APP_vSensorDiagnosticCapture(const diag_case *spec, uint8 row[DIAG_ROW_BYTES])
+{
+    static const char *const stages[]={"bus-settle","write-address","command-msb",
+        "command-lsb","command-wait","read-address","read-data","complete"};
+    static const char *const faults[]={"none","nack","tick-timeout",
+        "transfer-timeout","arbitration-lost","invalid-command"};
+    uint32 mv=0, pins=spec->location ? (3UL<<16) : (3UL<<14);
+    uint8 data[6];
+    bool_t received, control_ok=TRUE, voltage_ok;
+    vAHI_WatchdogRestart();
+    memset(row,0,DIAG_ROW_BYTES); memset(data,0xff,sizeof(data));
+    vAHI_DioSetOutput((spec->flags&DIAG_FLAG_LED) ? 0 : SENSOR_LED_MASK,
+                      (spec->flags&DIAG_FLAG_LED) ? SENSOR_LED_MASK : 0);
+    (void)wait_sensor_ticks(16000); /* Same 1 ms load-settle for every case. */
+    voltage_ok=APP_bBatteryMeasureMillivolts(&mv);
+    if (spec->flags&DIAG_FLAG_CLEAR_BUS) control_ok=diagnostic_clear_bus();
+    if (spec->flags&DIAG_FLAG_SOFT_RESET)
+        control_ok=command_at_configured(spec->location,spec->address,spec->prescaler,
+            0x30a2,2000,NULL,0,"suite-soft-reset",(uint32)spec->settle_units*100UL,TRUE);
+    received=command_at_configured(spec->location,spec->address,spec->prescaler,
+        spec->command,20000,data,6,"suite-measurement",(uint32)spec->settle_units*100UL,
+        !(spec->flags&DIAG_FLAG_NO_PULLUP));
+    row[1]=(uint8)diagnostic_name(sensor_stage,stages,sizeof(stages)/sizeof(stages[0]));
+    row[2]=(uint8)diagnostic_name(sensor_fault,faults,sizeof(faults)/sizeof(faults[0]));
+    row[3]=(received ? 1 : 0) | (received && data[2]==sht_crc(data,2) ? 2 : 0) |
+        (received && data[5]==sht_crc(data+3,2) ? 4 : 0) |
+        (diagnostic_idle & (spec->location ? 1UL<<16 : 1UL<<14) ? 8 : 0) |
+        (diagnostic_idle & (spec->location ? 1UL<<17 : 1UL<<15) ? 16 : 0) |
+        (control_ok ? 32 : 0) | (voltage_ok ? 64 : 0) | (spec->flags&DIAG_FLAG_LED ? 128 : 0);
+    row[4]=(uint8)mv; row[5]=(uint8)(mv>>8); memcpy(row+6,data,6);
+    row[12]=spec->flags | (spec->location ? 128 : 0);
+    row[13]=spec->settle_units; row[14]=spec->prescaler; row[15]=spec->address;
+    vAHI_SiMasterDisable(); vAHI_DioSetDirection(pins,0); vAHI_DioSetPullup(0,pins);
+    vAHI_DioSetOutput(SENSOR_LED_MASK,0);
+}
+#endif
 
 PRIVATE int read_at(unsigned location, uint8_t address, uint8_t data[6], void *context)
 {

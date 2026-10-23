@@ -56,6 +56,11 @@ this build input does not resolve or explain the separate SHT30 address NACK.
 
 ### Further diagnostics
 
+For an automated battery-only investigation without UART wiring, see
+[persistent diagnostics](persistent-diagnostics.md). The temporary suite saves
+16 checks in nonvolatile memory and sends them through a separate Zigbee/MQTT
+diagnostic channel, with later replay available on external power.
+
 If another cell gives the same result, collect the SHT30 transaction stage,
 address ACK/NACK, timeout reason, received bytes and both CRC results, together
 with cluster lookup/report status. The source already logs transport stages and

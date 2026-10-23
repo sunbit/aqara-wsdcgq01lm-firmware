@@ -15,6 +15,13 @@ static unsigned network_resets, software_resets, invalidations, led_pulses;
 static int adc_stuck, cluster_missing;
 static tsCLD_PowerConfiguration power;
 static tsZCL_ClusterInstance cluster={&power};
+#ifdef SENSOR_PERSISTENT_DIAGNOSTICS
+static unsigned diagnostic_runs, diagnostic_wakes;
+static int diagnostic_busy;
+int APP_bDiagnosticBusy(void) {return diagnostic_busy;}
+void APP_vDiagnosticRequest(void) {if(!diagnostic_busy){++diagnostic_runs;diagnostic_busy=1;}}
+void APP_vDiagnosticWake(void) {++diagnostic_wakes;}
+#endif
 void DBG_vPrintf(int enabled_log,const char *format,...) {(void)enabled_log;(void)format;}
 uint32 u32AHI_DioReadInput(void) {return input;}
 uint32 u32AHI_DioInterruptStatus(void) {return 0;}
@@ -68,6 +75,20 @@ static void led_tick(void) {assert(led_timer);led_timer=0;APP_cbTimerLedBlink(NU
 #endif
 int main(void)
 {
+#ifdef SENSOR_PERSISTENT_DIAGNOSTICS
+    APP_vSetupLeds();APP_vConfigureButtons();
+    irq(1);edge();assert(diagnostic_runs==1&&!scan_timer&&!samples&&!reports);
+    led_tick();assert(!led_on);
+    APP_vSendResetDeviceEvent();APP_vProcessEvents();assert(!network_resets);
+    irq(0);edge();assert(!scan_timer);
+    irq(1);edge();assert(diagnostic_runs==1&&!led_on&&!scan_timer);
+    irq(0);edge();diagnostic_busy=0;
+    irq(1);edge();assert(diagnostic_runs==2&&led_on&&!scan_timer);
+    led_tick();APP_vSendSensorTimerEvent();APP_vProcessEvents();
+    assert(diagnostic_wakes==1&&!samples&&!reports&&!network_resets&&!activities);
+    puts("PASS: diagnostic press/release rearming, busy guard and no network reset");
+    return 0;
+#endif
 #ifdef SENSOR_LED_FEEDBACK
     APP_vSetupLeds();assert(!led_on&&!led_timer);
 #endif

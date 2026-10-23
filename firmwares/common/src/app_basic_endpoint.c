@@ -74,6 +74,9 @@ PUBLIC void APP_vRegisterBasicEndPoint(void)
     sBasicEndpoint.humidity.u16MeasuredValue = 0xffff;
     sBasicEndpoint.humidity.u16MinMeasuredValue = 0;
     sBasicEndpoint.humidity.u16MaxMeasuredValue = 10000;
+#ifdef SENSOR_PERSISTENT_DIAGNOSTICS
+    APP_vDiagnosticCluster(&sBasicEndpoint.sClusterInstance.diagnostics, &sBasicEndpoint.diagnostics);
+#endif
     sBasicEndpoint.sEndPoint.u8EndPointNumber = sDeviceConfig.u8BasicEndpoint;
     sBasicEndpoint.sEndPoint.u16ManufacturerCode = ZCL_MANUFACTURER_CODE;
     sBasicEndpoint.sEndPoint.u16ProfileEnum = HA_PROFILE_ID;

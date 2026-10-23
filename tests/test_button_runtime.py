@@ -81,7 +81,10 @@ class ButtonRuntimeTests(unittest.TestCase):
     def test_real_button_led_and_fresh_reports_integration(self):
         self.compile_and_run(True)
 
-    def compile_and_run(self, with_led):
+    def test_persistent_profile_button_rearms_without_network_reset(self):
+        self.compile_and_run(True, True)
+
+    def compile_and_run(self, with_led, persistent=False):
         compiler = shutil.which('clang') or shutil.which('cc')
         self.assertIsNotNone(compiler, 'A host C compiler is required')
         with tempfile.TemporaryDirectory(prefix='aqara-button-runtime-') as temporary:
@@ -99,6 +102,11 @@ class ButtonRuntimeTests(unittest.TestCase):
                 'app_battery_fresh.c')]
             if with_led:
                 command += ['-DSENSOR_LED_FEEDBACK=1', str(KIT / 'firmwares/common/src/app_sensor_led.c')]
+            if persistent:
+                command += ['-DSENSOR_PERSISTENT_DIAGNOSTICS=1']
+                (folder/'app_diagnostic_suite.h').write_text('#include "sdk.h"\n'
+                    'void APP_vDiagnosticRequest(void);\nvoid APP_vDiagnosticWake(void);\n'
+                    'int APP_bDiagnosticBusy(void);\n')
             executable = folder / 'test'
             command += [str(KIT / 'tests/button_runtime_test.c'), '-o', str(executable)]
             result = subprocess.run(command, capture_output=True, text=True)

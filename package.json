@@ -4,7 +4,7 @@
   "type": "module",
   "packageManager": "pnpm@11.25.0",
   "scripts": {
-    "test": "node --test tests/converter.test.mjs"
+    "test": "node --test tests/*.test.mjs"
   },
   "devDependencies": {
     "zigbee-herdsman-converters": "26.90.0"

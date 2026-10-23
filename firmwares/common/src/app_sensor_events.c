@@ -16,6 +16,9 @@
 #include "app_sensor_events.h"
 #include "app_battery_fresh.h"
 #include "AppHardwareApi.h"
+#ifdef SENSOR_PERSISTENT_DIAGNOSTICS
+#include "app_diagnostic_suite.h"
+#endif
 #ifdef SENSOR_LED_DIAGNOSTICS
 #include "app_sensor_led.h"
 #include "sensor_diagnostic.h"
@@ -72,6 +75,19 @@ PUBLIC void APP_vProcessEvents(void)
         PWRM_eFinishActivity();
     }
     MICRO_RESTORE_INTERRUPTS(saved);
+#ifdef SENSOR_PERSISTENT_DIAGNOSTICS
+    /* This temporary image keeps normal sensor traffic out of the suite.
+     * Matrix execution and PDM writes happen only in the main-loop task. */
+    if (flags & REQUEST_BUTTON) APP_vDiagnosticRequest();
+    if (flags & REQUEST_PERIODIC) {
+        if (bNodeJoined()) {
+            ZPS_eAplAfSendKeepAlive();
+            APP_vStartPolling(POLL_REGULAR);
+        }
+        APP_vDiagnosticWake();
+    }
+    return;
+#endif
     if (flags & REQUEST_RESET) {
         /* Network-only reset: preserve offsets and reporting preferences. */
         APP_vResetNetworkRecords();

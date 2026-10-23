@@ -6,6 +6,9 @@
 #include "app_sensor_button.h"
 #include "app_sensor_events.h"
 #include "button_debounce.h"
+#ifdef SENSOR_PERSISTENT_DIAGNOSTICS
+#include "app_diagnostic_suite.h"
+#endif
 #ifdef SENSOR_LED_FEEDBACK
 #include "app_sensor_led.h"
 #endif
@@ -100,12 +103,18 @@ PUBLIC void APP_cbTimerButtonScan(void *context)
     edge = button_debounce_update(&button, pressed_now());
     if (edge > 0) {
         hold_ticks = 0;
+#ifdef SENSOR_PERSISTENT_DIAGNOSTICS
+        hold_armed = FALSE; /* Dedicated diagnostic image cannot re-pair. */
+        if (!APP_bDiagnosticBusy()) APP_vSensorLedPress();
+        APP_vSendFreshSensorEvent();
+#else
         hold_armed = TRUE;
 #ifdef SENSOR_LED_FEEDBACK
         APP_vSensorLedPress();
 #endif
         DBG_vPrintf(TRUE, "BUTTON pressed DIO5: request fresh temperature/humidity/battery\n");
         APP_vSendFreshSensorEvent();
+#endif
     } else if (edge < 0) {
         hold_armed = FALSE;
         hold_ticks = 0;

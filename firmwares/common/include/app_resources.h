@@ -11,7 +11,11 @@
 #endif
 
 #ifndef APP_ZTIMER_STORAGE
+#ifdef SENSOR_PERSISTENT_DIAGNOSTICS
+#define APP_ZTIMER_STORAGE 5
+#else
 #define APP_ZTIMER_STORAGE 4
+#endif
 #endif
 
 #define BDB_QUEUE_SIZE 5
@@ -37,6 +41,10 @@ extern PUBLIC uint8 u8TimerLedBlink;
 extern PUBLIC uint8 u8TimerButtonScan;
 extern PUBLIC uint8 u8TimerPoll;
 extern PUBLIC uint8 u8TimerZclTick;
+#ifdef SENSOR_PERSISTENT_DIAGNOSTICS
+extern PUBLIC uint8 u8TimerDiagnostic;
+PUBLIC void APP_cbTimerDiagnostic(void *context);
+#endif
 
 PUBLIC void APP_vInitResources(void);
 PUBLIC void APP_cbTimerZclTick(void *pvParam);

@@ -16,6 +16,9 @@
 #include "app_sensor_events.h"
 #include "ConfigurationCluster.h"
 #include "app_sensor_clock.h"
+#ifdef SENSOR_PERSISTENT_DIAGNOSTICS
+#include "app_diagnostic_suite.h"
+#endif
 
 #ifdef DBG_ENABLE
 PRIVATE uint32 logSleepAttempt = 0;
@@ -69,7 +72,11 @@ PUBLIC void vAppMain(void)
     APP_vInitResources();
     APP_vInitialise(vfExtendedStatusCallBack);
     APP_vSensorClockInit();
+#ifdef SENSOR_PERSISTENT_DIAGNOSTICS
+    APP_vDiagnosticInit();
+#else
     APP_vSensorProbe();
+#endif
     BDB_vStart();
     vMainLoop();
 }
@@ -277,6 +284,9 @@ PRIVATE void vMainLoop(void)
         bdb_taskBDB();
         ZTIMER_vTask();
         APP_vProcessEvents();
+#ifdef SENSOR_PERSISTENT_DIAGNOSTICS
+        APP_vDiagnosticProcess();
+#endif
         vAHI_WatchdogRestart();
         vAttemptToSleep();
         PWRM_vManagePower();

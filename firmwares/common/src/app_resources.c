@@ -26,6 +26,9 @@ PUBLIC uint8 u8TimerLedBlink;
 PUBLIC uint8 u8TimerButtonScan;
 PUBLIC uint8 u8TimerPoll;
 PUBLIC uint8 u8TimerZclTick;
+#ifdef SENSOR_PERSISTENT_DIAGNOSTICS
+PUBLIC uint8 u8TimerDiagnostic;
+#endif
 
 PRIVATE void APP_vInitTimers(void);
 PRIVATE void APP_vInitQueues(void);
@@ -46,6 +49,9 @@ PRIVATE void APP_vInitTimers(void)
     ZTIMER_eOpen(&u8TimerButtonScan, APP_cbTimerButtonScan, NULL, ZTIMER_FLAG_PREVENT_SLEEP);
     ZTIMER_eOpen(&u8TimerPoll, APP_cbTimerPoll, NULL, ZTIMER_FLAG_PREVENT_SLEEP);
     ZTIMER_eOpen(&u8TimerZclTick, APP_cbTimerZclTick, NULL, ZTIMER_FLAG_PREVENT_SLEEP);
+#ifdef SENSOR_PERSISTENT_DIAGNOSTICS
+    ZTIMER_eOpen(&u8TimerDiagnostic, APP_cbTimerDiagnostic, NULL, ZTIMER_FLAG_PREVENT_SLEEP);
+#endif
     DBG_vPrintf(TRACE_RESOURCES, "APP RESOURCES: APP_vInitTimers finished\n");
 }
 

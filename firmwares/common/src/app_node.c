@@ -171,8 +171,10 @@ PRIVATE void vHandleNetworkJoinAndRejoin(void)
     DBG_vPrintf(TRACE_NODE, "NODE: Device successfully joined network. Saving state to PDM\n");
     eNodeState = E_JOINED;
     APP_vSensorInvalidate();
+#ifndef SENSOR_PERSISTENT_DIAGNOSTICS
     APP_vSensorSampleRequested(FALSE, FALSE);
     APP_vSensorBatteryReport(TRUE);
+#endif
     PDM_eSaveRecordData(PDM_ID_APP_END_DEVICE, &eNodeState, sizeof(teNodeState));
     ZPS_vSaveAllZpsRecords();
 }

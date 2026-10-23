@@ -13,12 +13,10 @@ PUBLIC void APP_vBatteryReportFresh(void)
     (void)APP_bBatteryReportFresh();
 }
 
-PUBLIC bool_t APP_bBatteryReportFresh(void)
+PUBLIC bool_t APP_bBatteryMeasureMillivolts(uint32 *millivolts)
 {
-    uint32 budget = 500000UL, millivolts, percentage;
+    uint32 budget = 500000UL;
     uint16 raw;
-    tsZCL_ClusterInstance *power;
-    bool_t voltage_sent, percentage_sent;
     vAHI_AdcEnable(E_AHI_ADC_SINGLE_SHOT, E_AHI_AP_INPUT_RANGE_2, E_AHI_ADC_SRC_VOLT);
     vAHI_AdcStartSample();
     while (bAHI_AdcPoll()) {
@@ -30,7 +28,16 @@ PUBLIC bool_t APP_bBatteryReportFresh(void)
     }
     vAHI_AdcDisable();
     raw = u16AHI_AdcRead();
-    millivolts = ((uint32)raw * 7410UL) >> 11; /* Same scale as existing ADC path. */
+    *millivolts = ((uint32)raw * 7410UL) >> 11;
+    return TRUE;
+}
+
+PUBLIC bool_t APP_bBatteryReportFresh(void)
+{
+    uint32 millivolts, percentage;
+    tsZCL_ClusterInstance *power;
+    bool_t voltage_sent, percentage_sent;
+    if (!APP_bBatteryMeasureMillivolts(&millivolts)) return FALSE;
     percentage = millivolts <= BATTERY_MIN_MV ? 0 :
                  (millivolts - BATTERY_MIN_MV) * 100 / BATTERY_DELTA_MV;
     if (percentage > 100) percentage = 100;

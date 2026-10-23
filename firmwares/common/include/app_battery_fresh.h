@@ -3,4 +3,5 @@
 #include <jendefs.h>
 PUBLIC void APP_vBatteryReportFresh(void);
 PUBLIC bool_t APP_bBatteryReportFresh(void);
+PUBLIC bool_t APP_bBatteryMeasureMillivolts(uint32 *millivolts);
 #endif

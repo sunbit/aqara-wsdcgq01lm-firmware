@@ -48,3 +48,7 @@ cmake --build build-release -j1
 For a debug build, use `build-debug` and `-DENABLE_DEBUG=ON`. All future builds
 should use this repository's source. See [development and validation](development.md)
 for host tests and hardware checks.
+
+For the optional temporary test image, see
+[persistent diagnostics](persistent-diagnostics.md). Normal builds leave
+`SENSOR_PERSISTENT_DIAGNOSTICS=OFF`.

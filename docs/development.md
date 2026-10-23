@@ -29,6 +29,13 @@ pnpm test
 Tests use the actual converter dependency, mocked endpoints and the herdsman ZCL
 codec. No MQTT broker or coordinator is involved.
 
+The optional [persistent diagnostic suite](persistent-diagnostics.md) also has
+tests for record corruption, save/readback failure, interrupted runs, replay
+without repeated sensor measurements, button rearming and disabled re-pairing.
+An actual C-generated lot is passed through the herdsman ZCL codec, the isolated
+extension and the passive collector to check duplicate/reordered packets,
+checksums and separation from normal entity state. These remain host tests.
+
 ## Cross-compilation
 
 Follow [building](building.md). Both debug and release profiles must compile.

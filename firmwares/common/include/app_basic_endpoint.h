@@ -8,6 +8,9 @@
 #include "ConfigurationCluster.h"
 #include "TemperatureMeasurement.h"
 #include "RelativeHumidityMeasurement.h"
+#ifdef SENSOR_PERSISTENT_DIAGNOSTICS
+#include "app_diagnostic_suite.h"
+#endif
 
 #ifdef DEBUG_BASIC_EP
 #define TRACE_BASIC_EP TRUE
@@ -23,6 +26,9 @@ typedef struct
     tsZCL_ClusterInstance sConfigurationServer;
     tsZCL_ClusterInstance sTemperatureServer;
     tsZCL_ClusterInstance sHumidityServer;
+#ifdef SENSOR_PERSISTENT_DIAGNOSTICS
+    tsZCL_ClusterInstance diagnostics;
+#endif
 } tsZHA_BasicEndpointClusterInstances __attribute__((aligned(4)));
 
 typedef struct
@@ -40,6 +46,9 @@ typedef struct
     tsCLD_Configuration sConfigurationCluster;
     tsCLD_TemperatureMeasurement temperature;
     tsCLD_RelativeHumidityMeasurement humidity;
+#ifdef SENSOR_PERSISTENT_DIAGNOSTICS
+    diagnostic_cluster_data diagnostics;
+#endif
 } tsZHA_BasicEndpoint;
 
 PUBLIC void APP_vRegisterBasicEndPoint(void);

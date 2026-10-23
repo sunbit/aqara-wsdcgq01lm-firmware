@@ -50,6 +50,13 @@ elseif(SENSOR_LED_DIAGNOSTICS AND SENSOR_I2C_DIAGNOSTIC_PROFILE STREQUAL "settle
 else()
     message(FATAL_ERROR "Use normal, or enable SENSOR_LED_DIAGNOSTICS for the slow/settle I2C comparison profiles.")
 endif()
+option(SENSOR_PERSISTENT_DIAGNOSTICS "Build the temporary persistent diagnostic suite" OFF)
+if(SENSOR_PERSISTENT_DIAGNOSTICS)
+    if(SENSOR_LED_DIAGNOSTICS OR NOT SENSOR_I2C_DIAGNOSTIC_PROFILE STREQUAL "normal")
+        message(FATAL_ERROR "Persistent diagnostics selects its own cases; leave LED diagnostics OFF and the I2C comparison profile normal.")
+    endif()
+    add_compile_definitions(SENSOR_PERSISTENT_DIAGNOSTICS=1)
+endif()
 
 set(SDK_PREFIX ${PROJECT_SOURCE_DIR}/sdk CACHE PATH "External NXP SDK root")
 set(SDK_COMPONENTS_BASE_DIR ${SDK_PREFIX}/Components)
@@ -111,6 +118,18 @@ set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -T${SDK_PREFIX}/Chip/${JEN
 set(ZPS_CONFIG "${SDK_PREFIX}/Tools/ZPSConfig/ZPSConfig.py")
 set(PDUM_CONFIG "${SDK_PREFIX}/Tools/PDUMConfig/PDUMConfig.py")
 set(ZPSCFG_FILE "${CMAKE_CURRENT_SOURCE_DIR}/${APP_TARGET}/app.zpscfg")
+if(SENSOR_PERSISTENT_DIAGNOSTICS)
+    set(ORIGINAL_ZPSCFG_FILE "${ZPSCFG_FILE}")
+    set(ZPSCFG_FILE "${CMAKE_CURRENT_BINARY_DIR}/diagnostic.zpscfg")
+    execute_process(COMMAND ${Python3_EXECUTABLE}
+        "${PROJECT_SOURCE_DIR}/scripts/diagnostic-zpscfg.py" "${ORIGINAL_ZPSCFG_FILE}" "${ZPSCFG_FILE}"
+        RESULT_VARIABLE DIAG_CONFIG_STATUS)
+    if(NOT DIAG_CONFIG_STATUS EQUAL 0)
+        message(FATAL_ERROR "Could not prepare diagnostic endpoint configuration")
+    endif()
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+        "${ORIGINAL_ZPSCFG_FILE}" "${PROJECT_SOURCE_DIR}/scripts/diagnostic-zpscfg.py")
+endif()
 add_custom_command(
     OUTPUT
         zps_gen.c
@@ -257,6 +276,9 @@ set(APP_SRC
     pdum_gen.c
     pdum_apdu.S
 )
+if(SENSOR_PERSISTENT_DIAGNOSTICS)
+    list(APPEND APP_SRC common/src/diagnostic_suite.c common/src/app_diagnostic_suite.c)
+endif()
 add_executable(${APP_TARGET} ${APP_SRC})
 
 target_compile_definitions(${APP_TARGET} PRIVATE
