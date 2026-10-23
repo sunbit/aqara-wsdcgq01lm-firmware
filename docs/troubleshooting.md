@@ -31,6 +31,9 @@ availability status is also insufficient evidence of continued reports.
 
 ### Controlled comparison
 
+These are initial checks, not a reason to repeat the same cell or timing tests.
+Once the failure is identified as an address NACK, use the decision plan below.
+
 1. Keep the same binary and saved network state.
 2. Try another known-good CR2032 with all adapter wires disconnected. Record a
    short-button result, then leave the board untouched to check periodic reports.
@@ -53,6 +56,83 @@ have omitted the battery-voltage reportable flag in the external SDK. Its LED
 transport result remains useful, but its cached MQTT voltage is not evidence of
 the actual supply. The build now rejects an SDK missing that flag. Correcting
 this build input does not resolve or explain the separate SHT30 address NACK.
+
+### Power path investigation: decide what a test would change
+
+JP1 VCC and the battery positive contact have not been confirmed to be the same
+electrical node on this board. The relationship between their ground contacts,
+SHT30 VDD and SHT30 nRESET is also not fully mapped. A programming pad is access
+to a PCB connection; its name alone does not prove where it joins the battery
+supply. The MCU does not inherently know which connector supplies it.
+
+There are several possible arrangements. Both inputs may be wired directly
+together, or one may reach a rail through a protection component, switch or
+resistive connection. Supplying a downstream rail can bypass that component.
+These are circuit possibilities, not identified components on the LM15-THS3.0.
+Fixture pressure can also change an intermittent connection independently of
+the electrical input used.
+
+Two manufacturer references explain relevant mechanisms:
+
+- Sensirion documents protection diodes on SCL/SDA and warns that a hard power
+  reset must also remove voltage from SDA, SCL and ADDR to avoid powering the
+  SHT30 through those pins. This makes unintended signal-path powering a real
+  possibility, not proof that it occurs here. See sections 3.2 and 4.9 of the
+  [SHT3x-DIS datasheet](https://sensirion.com/media/documents/213E6A3B/63A5A569/Datasheet_SHT3x_DIS.pdf).
+- TI's [TIDA-01575 reference design, section 2.3.5](https://www.ti.com/lit/ug/tidudk5a/tidudk5a.pdf)
+  uses a GPIO-controlled load switch and a software power-up sequence for its
+  sensor. This is an example of board-specific initialization that firmware
+  must implement, not a schematic or GPIO assignment for this Aqara board.
+
+The current [board configuration](../firmwares/WSDCGQ01LM_DEV/device_config.c)
+and [sensor driver](../firmwares/common/src/app_sensor.c) contain no dedicated
+SHT30 supply-enable or hardware-reset mapping. If this board needs one, a
+firmware correction remains possible. Identify the actual connection and
+polarity before implementing it; do not search by driving unknown GPIOs.
+
+**First identify the electrical path.** With the battery removed, the USB and
+all other supplies disconnected, compare battery-positive to JP1 VCC and
+battery-negative to JP1 GND at their accessible contacts. Record settled
+resistance in both probe orientations and compare it with the meter-lead
+resistance. A brief continuity beep can come from charging a capacitor; it is
+not proof of a direct connection. Even a stable low resistance does not exclude
+intermittent contact or a voltage drop under load. Do not short a suspected
+protection component or connect two supplies together to investigate it.
+
+If more evidence is needed, compare **one regulated source at the same measured
+voltage through the two supply entry points**, after identifying their polarity
+and valid voltage. Start at 3.0 V, keep the image and mechanical support the
+same, disconnect UART and other fixture signals, and leave the cell out.
+Power off before moving the source. Measure at the connected board, not only
+the supply display. Record a new diagnostic run for each condition; replayed
+records are not new measurements. Keep the same current limit and check that
+the source stays in voltage regulation.
+
+| Result | What it narrows down | Next action or possible correction |
+| --- | --- | --- |
+| Same source/voltage works through JP1 but fails through battery contacts | Entry path, ground return or connection pressure; not source voltage alone | Trace the difference. Repair a demonstrated contact fault, or implement a confirmed switch-enable/reset sequence if it is under MCU control. No blind bypass. |
+| Same source/voltage works through both inputs, but a cell fails | Cell/holder behavior or load transients remains plausible | Compare the holder contact interface and supply under load. If failure tracks overlapping loads, test measuring before LED/radio activity and restoring normal operation afterward. Change firmware only if the controlled comparison supports it. |
+| Both inputs fail at 3.0 V and work at 3.3 V | Voltage sensitivity is real, but its location and cause are still unknown | Investigate actual sensor VDD, reset and bus levels; an MCU ADC snapshot cannot establish them. Do not impose a 3.3 V battery cutoff as a fix. |
+| After establishing the previous row, startup at the lower voltage fails but operation continues when lowered after a successful start | Startup/ramp/reset state rather than a simple steady operating limit | Implement the confirmed sensor power/reset order and restore it after sleep. Test cold starts and wakeups separately. |
+| Proper sensor supply/reset is independently established but both hardware and GPIO I2C still NACK | Signal integrity, a remaining transport defect or a component fault | Capture SCL/SDA at verified accessible points and compare against an unmodified board before replacing hardware. A logic analyzer cannot establish analog supply stability. |
+
+Do not run a voltage sweep just to find a threshold. Use the 3.0/3.3 V comparison
+only when the same-voltage input comparison has not separated the causes; a
+threshold alone does not specify a repair. If all input comparisons fail to
+separate the causes, stop adding software combinations and obtain an identified
+SHT30 supply/reset observation point or a reference-board comparison.
+
+A `write-address` NACK occurs before the measurement command and conversion
+wait in [sensor_wire.c](../firmwares/common/src/sensor_wire.c). Increasing that
+wait cannot fix this specific failure. A soft-reset command also requires an
+addressable sensor. Matching failures with the SI peripheral and GPIO I2C make
+a peripheral-only explanation less likely, but neither proves a damaged sensor.
+
+Before accepting a correction, validate cold battery starts, timed wakeups,
+fresh button-triggered readings, both measurement CRCs and received reports.
+Then check reporting thresholds and battery consumption using a normal release
+image. Keep the 0.1 °C reporting objective; do not mask missing measurements with
+cached values or treat the diagnostic image as a battery-life test.
 
 ### Further diagnostics
 
