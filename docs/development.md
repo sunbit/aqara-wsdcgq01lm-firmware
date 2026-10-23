@@ -36,6 +36,12 @@ An actual C-generated lot is passed through the herdsman ZCL codec, the isolated
 extension and the passive collector to check duplicate/reordered packets,
 checksums and separation from normal entity state. These remain host tests.
 
+The diagnostic-cluster test also checks the SDK's manufacturer metadata
+constraint against its regular report header. Cold-start battery tests cover a
+failed endpoint lookup, null instance/storage and an ADC timeout, as well as the
+normal initial values. Such failures must not dereference an unregistered cluster
+or publish an invented reading.
+
 ## Cross-compilation
 
 Follow [building](building.md). Both debug and release profiles must compile.

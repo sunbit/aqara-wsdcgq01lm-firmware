@@ -87,6 +87,7 @@ PUBLIC void APP_vRegisterBasicEndPoint(void)
     sBasicEndpoint.sEndPoint.pCallBackFunctions = &cbBasicEndpointCallback;
 
     eZCL_Status = eZCL_Register(&sBasicEndpoint.sEndPoint);
+    DBG_vPrintf(TRACE_BASIC_EP, "BASIC EP: eZCL_Register status: %d\n", eZCL_Status);
     if (eZCL_Status != E_ZCL_SUCCESS)
     {
         DBG_vPrintf(TRACE_BASIC_EP, "BASIC EP: eZCL_Register failed with status: %d\n", eZCL_Status);

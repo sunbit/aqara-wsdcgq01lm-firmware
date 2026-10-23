@@ -15,6 +15,10 @@ void vZCL_InitializeClusterInstance(tsZCL_ClusterInstance *i,int server,tsZCL_Cl
         void *shared,uint8 *control,void *a,void *b) {
     (void)i;(void)control;(void)a;(void)b;
     assert(server && d->id==DIAG_CLUSTER_ID && d->count==1 && shared==&data);
+    /* SDK registration rejects a manufacturer-specific cluster containing a
+     * regular attribute (status 35). Match the regular report helper's header. */
+    assert(!d->manufacturer_specific || (d->attrs[0].flags&E_ZCL_AF_MS));
+    assert(!d->manufacturer_specific && !(d->attrs[0].flags&E_ZCL_AF_MS));
 }
 int eZCL_SetReportableFlag(uint8 ep,uint16 cluster,int server,int ms,uint16 attr) {
     assert(ep==1 && cluster==DIAG_CLUSTER_ID && server && !ms && !attr);return 0;

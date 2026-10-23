@@ -163,7 +163,16 @@ was erased/damaged. A failed save/readback can still produce RAM results with
 
 Endpoint 1 sends attribute `0x0000` of private cluster `0xfc01` as a 24-byte ZCL
 octet string. The attribute uses a regular ZCL header because the SDK's report
-helper does not support manufacturer-specific attributes. Packet bytes are:
+helper does not support manufacturer-specific attributes.
+
+The SDK's cluster definition must also set `bIsManufacturerSpecificCluster` to
+`FALSE`, matching that regular attribute and header. Setting it to `TRUE` while
+leaving the attribute regular causes endpoint registration to fail with status
+35 (`E_ZCL_ERR_MANUFACTURER_SPECIFIC`). This SDK metadata constraint is checked
+by the host regression test. It does not change the private cluster ID or packet
+layout described here.
+
+Packet bytes are:
 
 | Bytes | Meaning |
 | --- | --- |
@@ -184,3 +193,21 @@ See [`diagnostic_suite.c`](../firmwares/common/src/diagnostic_suite.c) for the
 byte layout and fixed case table, and the receiver for decoded field names.
 Normal firmware does not use this record. A programmer that explicitly erases
 PDM/EEPROM can remove it; preserve captured results before reflashing.
+
+## Check a debug boot before battery testing
+
+With the debug image, the UART at 115200 and BOOT released, reset once and check
+that `BASIC EP: eZCL_Register status: 0` is followed by successful battery-cluster
+lookup, button setup and `DIAGNOSTIC restore ... report_flag=0`. A restore message
+with `valid=0` simply means no complete saved lot was found; collection still
+requires a short press. `DIAGNOSTIC start` identifies an accepted request and
+`DIAGNOSTIC suite complete ... durable=1` confirms a completed, saved/readback
+verified lot locally. MQTT receipt and collector checksum verification are still
+separate checks.
+
+If registration fails, diagnose its status before testing sensors. The startup
+battery path now checks lookup status and storage pointers and uses the bounded
+ADC helper, so a missing endpoint cannot cause an unchecked attribute write.
+These checks do not turn a failed endpoint registration into a working Zigbee
+device. Do not use debug UART operation on external power as evidence of battery
+operation.

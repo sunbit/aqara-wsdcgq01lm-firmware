@@ -21,6 +21,7 @@ typedef int bool_t;
 #define FALSE 0
 #define E_ZCL_AF_RD 1
 #define E_ZCL_AF_RP 2
+#define E_ZCL_AF_MS 4
 #define E_ZCL_OSTRING 0x41
 #define E_ZCL_SECURITY_NETWORK 0
 #define PDM_E_STATUS_OK 0
@@ -30,7 +31,7 @@ typedef int bool_t;
 #define POLL_REGULAR 0
 typedef struct {uint8 u8MaxLength,u8Length; uint8 *pu8Data;} tsZCL_OctetString;
 typedef struct {uint16 id; int flags,type; uint32 offset; int storage;} tsZCL_AttributeDefinition;
-typedef struct {uint16 id; int server,security; unsigned count; tsZCL_AttributeDefinition *attrs; void *handler;} tsZCL_ClusterDefinition;
+typedef struct {uint16 id; int manufacturer_specific,security; unsigned count; tsZCL_AttributeDefinition *attrs; void *handler;} tsZCL_ClusterDefinition;
 typedef struct {int unused;} tsZCL_ClusterInstance;
 extern uint8 u8TimerDiagnostic,u8TimerZclTick;
 void vZCL_InitializeClusterInstance(tsZCL_ClusterInstance *,int,tsZCL_ClusterDefinition *,void *,uint8 *,void *,void *);

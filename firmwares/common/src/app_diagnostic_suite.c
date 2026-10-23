@@ -30,7 +30,9 @@ PRIVATE const tsZCL_AttributeDefinition attributes[] = {
         (uint32)offsetof(diagnostic_cluster_data, packet), 0}
 };
 PRIVATE tsZCL_ClusterDefinition definition = {
-    DIAG_CLUSTER_ID, TRUE, E_ZCL_SECURITY_NETWORK, 1,
+    /* Match the non-MS attribute and regular header used by the SDK report
+     * helper. A TRUE manufacturer flag here makes registration fail with 35. */
+    DIAG_CLUSTER_ID, FALSE, E_ZCL_SECURITY_NETWORK, 1,
     (tsZCL_AttributeDefinition *)attributes, NULL
 };
 
@@ -62,14 +64,18 @@ PUBLIC void APP_cbTimerDiagnostic(void *context) {(void)context; if (state) time
 PUBLIC void APP_vDiagnosticInit(void)
 {
     uint16 bytes=0;
+    int read_status, report_status;
     state=0; timer_due=FALSE; pending_replay=FALSE; rounds=0;
     memset(&record,0,sizeof(record));
-    durable=PDM_eReadDataFromRecord(DIAG_PDM_ID,&record,sizeof(record),&bytes)==PDM_E_STATUS_OK &&
+    read_status=PDM_eReadDataFromRecord(DIAG_PDM_ID,&record,sizeof(record),&bytes);
+    durable=read_status==PDM_E_STATUS_OK &&
         bytes==sizeof(record) && diag_record_valid(&record);
     restored=durable;
     last_run=durable ? diag_record_run(&record) : 0;
     if (durable) {rounds=3; pending_replay=TRUE;}
-    (void)eZCL_SetReportableFlag(1,DIAG_CLUSTER_ID,TRUE,FALSE,0);
+    report_status=eZCL_SetReportableFlag(1,DIAG_CLUSTER_ID,TRUE,FALSE,0);
+    DBG_vPrintf(TRUE,"DIAGNOSTIC restore status=%d bytes=%d valid=%d run=%d report_flag=%d\n",
+        read_status,bytes,durable,last_run,report_status);
 }
 
 PUBLIC void APP_vDiagnosticRequest(void)
@@ -82,6 +88,7 @@ PUBLIC void APP_vDiagnosticRequest(void)
     diag_record_begin(&record,run);
     durable=restored=pending_replay=FALSE; rounds=0; case_index=0;
     state=1; PWRM_eStartActivity();
+    DBG_vPrintf(TRUE,"DIAGNOSTIC start run=%d cases=%d\n",run,DIAG_CASES);
     /* Allow the original feedback flash to finish before the LED-OFF case. */
     (void)schedule(500);
 }
