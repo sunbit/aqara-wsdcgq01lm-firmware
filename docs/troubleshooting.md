@@ -47,6 +47,13 @@ not a direct measurement at the SHT30 and does not capture supply dips. Do not
 conclude that the sensor requires bench voltage from this observation alone.
 Battery percentage is a voltage-based estimate, not a measured charge counter.
 
+If percentage changes while voltage stays at a previous bench-supply value,
+check the SDK setup in [building](building.md). A diagnostic build was found to
+have omitted the battery-voltage reportable flag in the external SDK. Its LED
+transport result remains useful, but its cached MQTT voltage is not evidence of
+the actual supply. The build now rejects an SDK missing that flag. Correcting
+this build input does not resolve or explain the separate SHT30 address NACK.
+
 ### Further diagnostics
 
 If another cell gives the same result, collect the SHT30 transaction stage,

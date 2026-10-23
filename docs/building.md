@@ -27,6 +27,11 @@ cmake --build build-release -j1
 
 The image is written to `build-release/firmwares/WSDCGQ01LM_DEV.bin`. Keep your build log, compiler/SDK versions, and SHA-256 checksum with any firmware you share. A successful local build does not validate operation on a physical sensor.
 
+CMake checks the battery voltage declaration and stops if step 3 was missed.
+The runtime reportable flag alone does not replace the SDK attribute declaration.
+Without this setup, battery percentage can update while the voltage displayed
+by Zigbee2MQTT remains cached. Do not use that cached voltage to diagnose power.
+
 ## External SDK/toolchain locations
 
 The defaults above can be replaced with existing local installations:

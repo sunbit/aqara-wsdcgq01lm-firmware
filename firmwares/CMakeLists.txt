@@ -42,6 +42,13 @@ endif()
 
 set(SDK_PREFIX ${PROJECT_SOURCE_DIR}/sdk CACHE PATH "External NXP SDK root")
 set(SDK_COMPONENTS_BASE_DIR ${SDK_PREFIX}/Components)
+# A missing SDK setup step otherwise yields a successful image whose percentage
+# changes while Zigbee2MQTT retains an old voltage. Fail before compiling it.
+file(READ "${SDK_COMPONENTS_BASE_DIR}/ZCL/Clusters/General/Source/PowerConfiguration.c" POWER_CONFIGURATION_SOURCE)
+string(REGEX MATCH "\\{E_CLD_PWRCFG_ATTR_ID_BATTERY_VOLTAGE,[^}]*\\}" BATTERY_VOLTAGE_DEFINITION "${POWER_CONFIGURATION_SOURCE}")
+if(NOT BATTERY_VOLTAGE_DEFINITION MATCHES "E_ZCL_AF_RP")
+    message(FATAL_ERROR "SDK battery voltage attribute is not reportable. Apply the local SDK setup step in docs/building.md (E_ZCL_AF_RD|E_ZCL_AF_RP) before building.")
+endif()
 
 set(SDK_INCLUDE_FOLDERS
     ${SDK_COMPONENTS_BASE_DIR}/Aes/Include
