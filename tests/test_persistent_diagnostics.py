@@ -63,10 +63,12 @@ class PersistentDiagnosticTests(unittest.TestCase):
                     str(ROOT/'firmwares/common/src/diagnostic_suite.c'),
                     str(ROOT/'firmwares/common/src/app_diagnostic_suite.c'),
                     str(ROOT/'tests/persistent_diagnostic_test.c'),'-o',str(folder/'test')]
-            result = subprocess.run(args,capture_output=True,text=True)
-            self.assertEqual(result.returncode,0,result.stderr)
-            result = subprocess.run([str(folder/'test')],capture_output=True,text=True)
-            self.assertEqual(result.returncode,0,result.stderr)
+            for options in ([], ['-DSENSOR_GPIO_I2C_DIAGNOSTICS=1']):
+                with self.subTest(options=options):
+                    result = subprocess.run(args+options,capture_output=True,text=True)
+                    self.assertEqual(result.returncode,0,result.stderr)
+                    result = subprocess.run([str(folder/'test')],capture_output=True,text=True)
+                    self.assertEqual(result.returncode,0,result.stderr)
 
     def test_diagnostic_descriptor_is_generated_without_mutating_normal_xml(self):
         source = ROOT/'firmwares/WSDCGQ01LM_DEV/app.zpscfg'

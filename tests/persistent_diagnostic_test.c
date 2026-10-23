@@ -68,6 +68,11 @@ int main(void) {
     diag_record_begin(&test,0x12345678);diag_record_finish(&test);assert(!diag_record_valid(&test));
     for(unsigned n=0;n<DIAG_CASES;++n)diag_record_row(&test,n)[0]=n+1;
     diag_record_finish(&test);assert(diag_record_valid(&test));
+    assert(test.bytes[4]==DIAG_PROTOCOL);
+    /* Replaying a previously saved suite must keep its original protocol. */
+    test.bytes[4]=DIAG_PROTOCOL==1 ? 2 : 1;
+    diag_record_finish(&test);assert(diag_record_valid(&test));
+    diag_packet(&test,16,1,1,packet);assert(packet[1]==test.bytes[4]);
     for(unsigned n=0;n<sizeof(test);++n) {test.bytes[n]^=1;assert(!diag_record_valid(&test));test.bytes[n]^=1;}
     diag_packet(&test,0,1,0,packet);assert(packet[2]==0x78&&packet[5]==0x12&&packet[7]==3&&packet[8]==1);
     diag_packet(&test,16,1,1,packet);assert(packet[6]==255&&packet[7]==7&&packet[8]==16);

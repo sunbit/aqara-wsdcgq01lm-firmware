@@ -10,6 +10,14 @@
 #define DIAG_FLAG_NO_PULLUP 2
 #define DIAG_FLAG_CLEAR_BUS 4
 #define DIAG_FLAG_SOFT_RESET 8
+#define DIAG_FLAG_GPIO 16
+#define DIAG_FLAG_LONG_SETTLE 32
+#define DIAG_FLAG_NO_FILTER 64
+#ifdef SENSOR_GPIO_I2C_DIAGNOSTICS
+#define DIAG_PROTOCOL 2
+#else
+#define DIAG_PROTOCOL 1
+#endif
 typedef struct {
     uint8_t location, address, prescaler, settle_units, flags;
     uint16_t command;

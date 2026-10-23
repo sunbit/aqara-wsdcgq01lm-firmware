@@ -54,6 +54,50 @@ The commands and nominal clock formula follow the
 [Sensirion SHT3x-DIS datasheet](https://sensirion.com/media/documents/213E6A3B/63A5A569/Datasheet_SHT3x_DIS.pdf)
 and [NXP JN516x peripherals guide](https://www.nxp.com/docs/en/user-guide/JN-UG-3087.pdf).
 
+## Compare the peripheral with software I²C
+
+The optional `SENSOR_GPIO_I2C_DIAGNOSTICS=ON` build replaces the case table with
+protocol **2**. It compares the MCU's SI peripheral with an independent GPIO
+transport on the confirmed DIO14/15 route and address `0x44`. This is useful when
+the peripheral reports an address NACK: a longer conversion wait cannot affect
+a transaction that exits before sending the measurement command.
+
+The software transport drives each line LOW or releases it as an input. It
+never drives a HIGH. It checks the actual SCL level with a bounded clock-stretch
+wait, samples SDA for each ACK/data bit, and releases both lines after errors.
+The nominal software rates are upper bounds: GPIO calls and interrupts can make
+them slower. They do not depend on the SI peripheral prescaler or status flags.
+
+| Case | Protocol 2 check |
+| --- | --- |
+| 1 | Peripheral baseline, 100 kHz |
+| 2 | GPIO I²C, nominal 5 kHz |
+| 3 | Peripheral baseline after the GPIO attempt |
+| 4 | GPIO I²C, nominal 1 kHz |
+| 5 | GPIO 5 kHz with MCU internal pullups off |
+| 6 | GPIO 5 kHz with 20 ms line settling |
+| 7 | GPIO 5 kHz with 200 ms line settling |
+| 8 | GPIO soft reset, then GPIO measurement with 200 ms settling |
+| 9 | Peripheral 100 kHz with pulse suppression off |
+| 10 | Peripheral 12.5 kHz with pulse suppression off |
+| 11 | Peripheral baseline with 200 ms line settling |
+| 12 | Nine-clock interface clear, then GPIO 5 kHz |
+| 13 | GPIO 5 kHz, medium repeatability |
+| 14 | GPIO 5 kHz, high repeatability |
+| 15 | Final GPIO 5 kHz baseline |
+| 16 | Final peripheral baseline |
+
+All cases use a 20 ms conversion wait. The original button still gives one
+feedback blink; this table has no extra LED-load case. A `bus-stuck` result means
+SDA was LOW when the GPIO transport expected an idle or completed STOP state.
+`transfer-timeout` can indicate that released SCL did not rise within 1 ms.
+
+Compare the same image on battery and external power. A valid GPIO measurement
+would narrow the investigation to the peripheral transport/timing or electrical
+differences between the two methods. Matching failures do not prove a defective
+sensor: sensor power/reset, signal levels and the board's supply path would
+still require investigation. This profile is not an automatic production fix.
+
 ## Build
 
 Use the external SDK/toolchain setup in [building](building.md), including the
@@ -71,6 +115,11 @@ Keep `SENSOR_LED_DIAGNOSTICS=OFF` and
 `SENSOR_I2C_DIAGNOSTIC_PROFILE=normal`; the suite selects its own settings.
 The image is `build-persistent/firmwares/WSDCGQ01LM_DEV.bin`. Build a separate
 debug image with `ENABLE_DEBUG=ON` if UART output is needed.
+
+For the GPIO comparison, use another build directory and add
+`-DSENSOR_GPIO_I2C_DIAGNOSTICS=ON` to that command. Keep
+`SENSOR_PERSISTENT_DIAGNOSTICS=ON`. Update the receiver and collector from the
+same source revision before running it; both understand protocol 1 and 2.
 
 ## Receive results without changing normal measurements
 
@@ -110,8 +159,8 @@ python3 scripts/collect-diagnostics.py \
   --topic 'zigbee2mqtt/diagnostics/wsdcgq01lm/your-device'
 ```
 
-The collector never connects to a broker or sends commands. It groups by topic
-and run ID, tolerates duplicates/reordering, lists missing cases and recomputes
+The collector never connects to a broker or sends commands. It groups by topic,
+protocol and run ID, tolerates duplicates/reordering, lists missing cases and recomputes
 the checksum of the complete saved record. `complete: true` means all 16 results
 match the summary checksum; it does not mean every sensor test passed.
 
@@ -176,7 +225,7 @@ Packet bytes are:
 
 | Bytes | Meaning |
 | --- | --- |
-| 0–1 | Marker `d1`, protocol version `01` |
+| 0–1 | Marker `d1`, protocol version `01` or `02` |
 | 2–5 | Run ID, little-endian |
 | 6 | Case index 0–15, or `ff` for a summary |
 | 7 | Bits 0: saved/readback verified; 1: suite finished; 2: restored from PDM |
@@ -188,6 +237,15 @@ cryptographic authenticity mechanism. Network security remains Zigbee's normal
 network security. Run IDs increment from the latest saved run, so clearing
 storage or losing an unsaved run can reuse an ID; keep captures separate across
 storage resets.
+
+Both persistent builds can replay either saved record version. Replay preserves
+the original protocol and case meanings; only a new button-triggered run uses
+the selected build's table. The 272-byte record and PDM slot are unchanged.
+In protocol 2, row flag bit 4 selects GPIO transport, bit 5 changes the settling
+unit from 100 µs to 1 ms, and bit 6 disables the peripheral pulse filter. For
+GPIO rows, the prescaler byte instead stores the half-period in 10 µs units.
+The receiver exposes `transport`, `pulse_filter`, `nominal_bus_hz` and
+`settle_us` so consumers do not need to interpret those flags themselves.
 
 See [`diagnostic_suite.c`](../firmwares/common/src/diagnostic_suite.c) for the
 byte layout and fixed case table, and the receiver for decoded field names.

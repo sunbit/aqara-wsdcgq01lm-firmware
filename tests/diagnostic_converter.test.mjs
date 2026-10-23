@@ -17,9 +17,9 @@ function execute(command, args, options = {}) {
     assert.equal(result.status, 0, result.stderr || result.error?.message);
     return result.stdout;
 }
-function fixture(folder) {
+function fixture(folder, gpio = false) {
     const binary = join(folder, 'fixture');
-    execute('cc', ['-std=c99', '-Wall', '-Wextra', '-Werror', '-I'+join(root,'firmwares/common/include'),
+    execute('cc', ['-std=c99', '-Wall', '-Wextra', '-Werror', ...(gpio ? ['-DSENSOR_GPIO_I2C_DIAGNOSTICS=1'] : []), '-I'+join(root,'firmwares/common/include'),
         join(root,'firmwares/common/src/diagnostic_suite.c'), join(root,'firmwares/common/src/sensor_math.c'),
         join(root,'tests/diagnostic_fixture.c'), '-o', binary]);
     return execute(binary, []).trim().split('\n').map((hex) => Buffer.from(hex, 'hex'));
@@ -89,12 +89,39 @@ test('bad packet shape/version/CRC flags never produce normal environmental valu
         const packets=fixture(folder), packet=Buffer.from(packets[1]);
         assert.equal(decodeDiagnosticPacket(packet.subarray(0,23)),null);
         assert.equal(decodeDiagnosticPacket('not bytes'),null);
-        packet[1]=2;assert.equal(decodeDiagnosticPacket(packet),null);packet[1]=1;
+        packet[1]=3;assert.equal(decodeDiagnosticPacket(packet),null);packet[1]=1;
         packet[14]^=1; // Corrupt raw temperature word while the device flags claim valid CRC.
         const result=decodeDiagnosticPacket(packet);
         assert.equal(result.crc_flags_match,false);
         assert.equal(result.passed,false);
         assert.equal(result.temperature,null);
+    } finally {rmSync(folder,{recursive:true,force:true});}
+});
+
+test('GPIO suite metadata and checksum coexist with older saved records', () => {
+    const folder=mkdtempSync(join(tmpdir(),'aqara-gpio-diagnostic-'));
+    try {
+        const old=fixture(folder), gpio=fixture(folder,true);
+        const decoded=gpio.map(decodeDiagnosticPacket);
+        const byId=(id)=>decoded.find((r)=>r.case_id===id);
+        assert.equal(byId(2).transport,'gpio');
+        assert.equal(byId(2).nominal_bus_hz,5000);
+        assert.equal(byId(4).nominal_bus_hz,1000);
+        assert.equal(byId(6).settle_us,20000);
+        assert.equal(byId(7).settle_us,200000);
+        assert.equal(byId(9).pulse_filter,false);
+        assert.equal(byId(9).transport,'peripheral');
+        assert.equal(byId(8).control_ok,true);
+        assert.equal(byId(16).name,'hardware_final_baseline');
+        const input=join(folder,'capture.jsonl'),output=join(folder,'result.json');
+        const lines=[...old,...gpio].map((p)=>JSON.stringify({topic:'test/a',payload:{diagnostic_result:decodeDiagnosticPacket(p)}}));
+        writeFileSync(input,lines.join('\n'));
+        execute('python3',[join(root,'scripts/collect-diagnostics.py'),'--input',input,'--output',output]);
+        const {runs}=JSON.parse(readFileSync(output,'utf8'));
+        assert.equal(runs.length,2);
+        assert.deepEqual(runs.map((r)=>r.protocol),[1,2]);
+        assert(runs.every((r)=>r.complete && r.checksum_matches));
+        assert.equal(runs[0].run_id,runs[1].run_id);
     } finally {rmSync(folder,{recursive:true,force:true});}
 });
 

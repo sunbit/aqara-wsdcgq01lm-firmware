@@ -18,6 +18,10 @@
 #include "app_battery_fresh.h"
 #include "app_sensor_clock.h"
 #include "dbg.h"
+#include "diagnostic_suite.h" /* Diagnostic transport flags; normal calls use zero. */
+#ifdef SENSOR_GPIO_I2C_DIAGNOSTICS
+#include "sensor_gpio_i2c.h"
+#endif
 #ifdef SENSOR_PERSISTENT_DIAGNOSTICS
 #include "app_diagnostic_suite.h"
 #include "app_sensor_led.h"
@@ -31,7 +35,7 @@ PUBLIC unsigned APP_uSensorDiagnosticResult(void) { return diagnostic_result; }
 
 #define BUS_TIMEOUT_LOOPS 500000UL /* Bounded polling, including SHT clock stretching. */
 #define SENSOR_DEFAULT_PRESCALER SENSOR_BUS_PRESCALER
-#define SENSOR_MEASUREMENT_COMMAND 0x2416 /* Low repeatability: v5 passed 3/3 with no resets. */
+#define SENSOR_MEASUREMENT_COMMAND 0x2416 /* SHT3x low-repeatability single shot. */
 
 PRIVATE sensor_report_state report_t, report_h, report_b;
 PRIVATE sht_route sensor_route;
@@ -63,7 +67,7 @@ PRIVATE bool_t transfer(bool_t start, bool_t stop, bool_t read, bool_t nack)
         return FALSE;
     }
     /* Let the peripheral latch its command before first polling TIP. This is
-     * a conservative guard, not a confirmed diagnosis of the v2 failure. */
+     * a conservative guard, not a confirmed root-cause correction. */
     if (!wait_sensor_ticks(32UL)) return FALSE; /* 2 us, at either bus rate. */
     while (bAHI_SiMasterPollTransferInProgress()) {
         if (--budget == 0) {
@@ -123,10 +127,25 @@ PRIVATE const sht_wire_io sensor_io = {
     wire_address, wire_write, wire_read, wire_transfer, wire_wait_us, wire_stage
 };
 
+#ifdef SENSOR_GPIO_I2C_DIAGNOSTICS
+PRIVATE void gpio_low(unsigned line, int enabled, void *context)
+{
+    uint32 mask = 1UL << (14 + line);
+    (void)context;
+    vAHI_DioSetDirection(enabled ? 0 : mask, enabled ? mask : 0);
+}
+PRIVATE int gpio_level(unsigned line, void *context)
+{
+    (void)context;
+    return !!(u32AHI_DioReadInput() & (1UL << (14 + line)));
+}
+PRIVATE const sht_gpio_io gpio_io = {gpio_low, gpio_level, wire_wait_us, wire_stage};
+#endif
+
 PRIVATE bool_t command_at_configured(unsigned location, uint8 address, uint8 prescaler,
                           uint16 command, uint32 wait_us, uint8 *data,
                           unsigned length, const char *label,
-                          uint32 settle_us, bool_t pullups)
+                          uint32 settle_us, bool_t pullups, uint8 diagnostic_flags)
 {
     uint32 pins = location ? ((1UL << 16) | (1UL << 17)) :
                              ((1UL << 14) | (1UL << 15));
@@ -138,8 +157,18 @@ PRIVATE bool_t command_at_configured(unsigned location, uint8 address, uint8 pre
     vAHI_SiMasterDisable();
     vAHI_DioSetDirection(pins, 0);
     vAHI_DioSetPullup(pullups ? pins : 0, pullups ? 0 : pins);
-    vAHI_SiMasterConfigure(TRUE, FALSE, prescaler);
-    vAHI_SiSetLocation(location != 0);
+#ifdef SENSOR_GPIO_I2C_DIAGNOSTICS
+    if (diagnostic_flags & DIAG_FLAG_GPIO) {
+        /* The software transport is restricted to the confirmed DIO14/15
+         * route. Output latches stay LOW; HIGH is always input/release. */
+        if (location != 0 || !prescaler) return FALSE;
+        vAHI_DioSetOutput(0, pins);
+    } else
+#endif
+    {
+        vAHI_SiMasterConfigure(!(diagnostic_flags & DIAG_FLAG_NO_FILTER), FALSE, prescaler);
+        vAHI_SiSetLocation(location != 0);
+    }
     sensor_stage = "bus-settle";
     sensor_fault = "none";
     sensor_byte = 0;
@@ -148,9 +177,20 @@ PRIVATE bool_t command_at_configured(unsigned location, uint8 address, uint8 pre
 #ifdef SENSOR_PERSISTENT_DIAGNOSTICS
     diagnostic_idle=idle_levels;
 #endif
-    if (received) received = sht_command_read(&sensor_io, NULL, address,
-                                              command, wait_us, data, length);
-    if (!received) {
+    if (received) {
+#ifdef SENSOR_GPIO_I2C_DIAGNOSTICS
+        if (diagnostic_flags & DIAG_FLAG_GPIO) {
+            static const char *const faults[] = {"none","nack","tick-timeout",
+                "transfer-timeout","arbitration-lost","invalid-command","bus-stuck"};
+            sht_gpio_bus bus = {&gpio_io, NULL, (uint32)prescaler * 10UL, 0, 0, 0};
+            received = sht_gpio_command_read(&bus, address, command, wait_us, data, length);
+            sensor_fault = bus.fault < 7 ? faults[bus.fault] : "invalid-command";
+        } else
+#endif
+            received = sht_command_read(&sensor_io, NULL, address,
+                                          command, wait_us, data, length);
+    }
+    if (!received && !(diagnostic_flags & DIAG_FLAG_GPIO)) {
         uint32 budget = BUS_TIMEOUT_LOOPS;
         /* End an incomplete transaction before disabling the controller.
          * Preserve the original failure stage/reason for the UART report. */
@@ -161,9 +201,10 @@ PRIVATE bool_t command_at_configured(unsigned location, uint8 address, uint8 pre
     vAHI_SiMasterDisable();
     vAHI_DioSetDirection(pins, 0);
     vAHI_DioSetPullup(0, pins);
-    DBG_vPrintf(TRUE, "SENSOR probe label=%s SCL=DIO%d SDA=DIO%d addr=0x%02x hz=%d cmd=0x%04x received=%d\n",
+    DBG_vPrintf(TRUE, "SENSOR probe label=%s SCL=DIO%d SDA=DIO%d addr=0x%02x hz=%d cmd=0x%04x received=%d gpio=%d\n",
                 label, location ? 16 : 14, location ? 17 : 15, address,
-                3200000UL / ((uint32)prescaler + 1), command, received);
+                (diagnostic_flags & DIAG_FLAG_GPIO) ? 50000UL / prescaler : 3200000UL / ((uint32)prescaler + 1),
+                command, received, !!(diagnostic_flags & DIAG_FLAG_GPIO));
     DBG_vPrintf(TRUE, "SENSOR detail stage=%s reason=%s byte=%d idle_scl=%d idle_sda=%d\n",
                 sensor_stage, sensor_fault, sensor_byte,
                 !!(idle_levels & (1UL << (location ? 16 : 14))),
@@ -186,7 +227,7 @@ PRIVATE bool_t command_at(unsigned location, uint8 address, uint8 prescaler,
                           unsigned length, const char *label)
 {
     return command_at_configured(location,address,prescaler,command,wait_us,data,
-        length,label,SENSOR_BUS_SETTLE_US,TRUE);
+        length,label,SENSOR_BUS_SETTLE_US,TRUE,0);
 }
 
 #ifdef SENSOR_PERSISTENT_DIAGNOSTICS
@@ -218,8 +259,9 @@ PUBLIC void APP_vSensorDiagnosticCapture(const diag_case *spec, uint8 row[DIAG_R
     static const char *const stages[]={"bus-settle","write-address","command-msb",
         "command-lsb","command-wait","read-address","read-data","complete"};
     static const char *const faults[]={"none","nack","tick-timeout",
-        "transfer-timeout","arbitration-lost","invalid-command"};
+        "transfer-timeout","arbitration-lost","invalid-command","bus-stuck"};
     uint32 mv=0, pins=spec->location ? (3UL<<16) : (3UL<<14);
+    uint32 settle_us=(uint32)spec->settle_units * ((spec->flags&DIAG_FLAG_LONG_SETTLE) ? 1000UL : 100UL);
     uint8 data[6];
     bool_t received, control_ok=TRUE, voltage_ok;
     vAHI_WatchdogRestart();
@@ -231,10 +273,10 @@ PUBLIC void APP_vSensorDiagnosticCapture(const diag_case *spec, uint8 row[DIAG_R
     if (spec->flags&DIAG_FLAG_CLEAR_BUS) control_ok=diagnostic_clear_bus();
     if (spec->flags&DIAG_FLAG_SOFT_RESET)
         control_ok=command_at_configured(spec->location,spec->address,spec->prescaler,
-            0x30a2,2000,NULL,0,"suite-soft-reset",(uint32)spec->settle_units*100UL,TRUE);
+            0x30a2,2000,NULL,0,"suite-soft-reset",settle_us,TRUE,spec->flags);
     received=command_at_configured(spec->location,spec->address,spec->prescaler,
-        spec->command,20000,data,6,"suite-measurement",(uint32)spec->settle_units*100UL,
-        !(spec->flags&DIAG_FLAG_NO_PULLUP));
+        spec->command,20000,data,6,"suite-measurement",settle_us,
+        !(spec->flags&DIAG_FLAG_NO_PULLUP),spec->flags);
     row[1]=(uint8)diagnostic_name(sensor_stage,stages,sizeof(stages)/sizeof(stages[0]));
     row[2]=(uint8)diagnostic_name(sensor_fault,faults,sizeof(faults)/sizeof(faults[0]));
     row[3]=(received ? 1 : 0) | (received && data[2]==sht_crc(data,2) ? 2 : 0) |

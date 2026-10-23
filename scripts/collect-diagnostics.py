@@ -21,11 +21,12 @@ def assemble(lines, topic=None):
             if isinstance(result, str):
                 result = json.loads(result)
             packet = bytes.fromhex(result['packet_hex'])
-            if len(packet) != 24 or packet[:2] != b'\xd1\x01':
+            if len(packet) != 24 or packet[0] != 0xd1 or packet[1] not in (1, 2):
                 raise ValueError('Invalid packet')
             run_id = int.from_bytes(packet[2:6], 'little')
             source = message.get('topic', '<raw-input>')
-            run = runs.setdefault((source, run_id), {'topic': source, 'run_id': run_id, 'cases': {}, 'summary': None,
+            protocol = packet[1]
+            run = runs.setdefault((source, protocol, run_id), {'topic': source, 'protocol': protocol, 'run_id': run_id, 'cases': {}, 'summary': None,
                                            'persisted_observed': False, 'replay_observed': False})
             run['persisted_observed'] |= bool(packet[7] & 1)
             run['replay_observed'] |= bool(packet[7] & 4)
@@ -42,7 +43,7 @@ def assemble(lines, topic=None):
     for run in runs.values():
         run['checksum_matches'] = False
         if len(run['cases']) == 16 and run['summary']:
-            record = bytearray(b'SHTD\x01\x10\x01\x00')
+            record = bytearray(b'SHTD' + bytes([run['protocol'], 16, 1, 0]))
             record += run['run_id'].to_bytes(4, 'little') + bytes(4)
             for index in range(16):
                 record += bytes.fromhex(run['cases'][index]['packet_hex'])[8:24]
