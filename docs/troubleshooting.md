@@ -108,3 +108,32 @@ The extra flashes keep the CPU awake and consume energy. Do not use this profile
 to assess battery consumption. It does not intentionally clear network state or
 persist diagnostics. It requires a separate physical flash; compilation and
 host tests do not establish that the displayed code is correct on real hardware.
+
+### Comparing bus speed and line settling
+
+Two optional builds investigate write-address NACKs, changing
+one parameter per image. Both require `SENSOR_LED_DIAGNOSTICS=ON` and keep the
+same LED codes, 0x2416 measurement command and 20 ms conversion wait.
+
+| `SENSOR_I2C_DIAGNOSTIC_PROFILE` | SCL nominal frequency | Bus settle before START |
+| --- | --- | --- |
+| `normal` (default) | 100 kHz | 100 µs |
+| `slow` | 25 kHz | 100 µs |
+| `settle` | 100 kHz | 5 ms |
+
+Use a distinct build directory for each image and record its hash. Add
+`-DSENSOR_I2C_DIAGNOSTIC_PROFILE=slow` or `=settle` to the documented CMake
+configuration arguments. Normal release builds default to `normal`; CMake
+rejects a comparison profile unless LED diagnostics are also enabled.
+
+First try `slow` on the battery without adapter wires. Count the second LED
+group after a short press and correlate it with MQTT. If it still produces
+code 2, try `settle` separately. Neither image is a proven fix. A changed result
+helps isolate timing sensitivity; an unchanged NACK does not alone prove a
+power or reset fault. No unknown GPIOs are driven to guess sensor power/reset.
+
+The nominal rates use NXP's 16 MHz peripheral-clock prescaler formula in
+[JN-UG-3087, section 29.1](https://www.nxp.com/docs/en/user-guide/JN-UG-3087.pdf).
+The longer settle applies after configuring the bus on each command; it is not
+an assertion about the board's sensor power-up requirements. These profiles
+add diagnostic work and must not be used for battery-life measurements.

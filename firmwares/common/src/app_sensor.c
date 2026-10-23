@@ -12,6 +12,7 @@
 #include "sensor_probe.h"
 #include "sensor_timing.h"
 #include "sensor_wire.h"
+#include "sensor_bus_profile.h"
 #include "sensor_reporting.h"
 #include "ConfigurationCluster.h"
 #include "app_battery_fresh.h"
@@ -24,7 +25,7 @@ PUBLIC unsigned APP_uSensorDiagnosticResult(void) { return diagnostic_result; }
 #endif
 
 #define BUS_TIMEOUT_LOOPS 500000UL /* Bounded polling, including SHT clock stretching. */
-#define SENSOR_DEFAULT_PRESCALER 31 /* 100 kHz: CRC-valid ht01 measurement in v3. */
+#define SENSOR_DEFAULT_PRESCALER SENSOR_BUS_PRESCALER
 #define SENSOR_MEASUREMENT_COMMAND 0x2416 /* Low repeatability: v5 passed 3/3 with no resets. */
 
 PRIVATE sensor_report_state report_t, report_h, report_b;
@@ -136,7 +137,7 @@ PRIVATE bool_t command_at(unsigned location, uint8 address, uint8 prescaler,
     sensor_stage = "bus-settle";
     sensor_fault = "none";
     sensor_byte = 0;
-    received = wait_sensor_ticks(1600UL); /* 100 us for the idle lines to settle. */
+    received = wait_sensor_ticks(SENSOR_BUS_SETTLE_US * 16UL);
     idle_levels = u32AHI_DioReadInput();
     if (received) received = sht_command_read(&sensor_io, NULL, address,
                                               command, wait_us, data, length);
