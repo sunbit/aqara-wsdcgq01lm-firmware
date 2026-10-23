@@ -32,6 +32,12 @@ The labels below are the board's JP1 signal names. Check your board orientation;
 
 Adapter DTR and CTS are unused. The 4.7 kΩ resistor and S1 are in series between SPIMISO/DO1 and ground. S2 is a momentary reset switch; it is not the original PCB button.
 
+The boot strap selects the startup mode when the device resets or powers up.
+Closing S1 after the application has started does not immediately stop it or
+prove that it is now in the bootloader. For a battery-versus-bench comparison,
+remove the board completely from the powered fixture and disconnect all
+adapter wires before inserting the battery, so the supply is unambiguous.
+
 ```text
 USB-UART                         Aqara JP1
 RX  <--------------------------- JP1.1 TXD0
